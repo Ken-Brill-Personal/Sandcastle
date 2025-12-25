@@ -11,7 +11,7 @@ License: MIT License
 import os
 import csv
 from rich.console import Console
-from picklist_utils import get_valid_picklist_values
+from sandcastle_pkg.utils.picklist_utils import get_valid_picklist_values
 
 console = Console()
 

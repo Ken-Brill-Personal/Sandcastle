@@ -10,6 +10,9 @@ License: MIT License
 Phase 1: Create all records with dummy lookups and save to CSV
 Phase 2: Update all records with actual lookup relationships
 """
+# Version number - increment with each release
+VERSION = "1.0.1"
+
 import os
 import json
 import argparse
@@ -22,9 +25,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from salesforce_cli import SalesforceCLI
-
-# Version number - increment with each release
-VERSION = "1.0.1"
 from record_utils import load_insertable_fields
 from delete_existing_records import delete_existing_records
 from dummy_records import create_dummy_records

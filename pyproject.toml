@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sandcastle-salesforce"
+version = "1.0.1"
+description = "Two-phase Salesforce data migration tool for sandbox environments"
+readme = "README.md"
+authors = [
+    {name = "Ken Brill"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "rich>=13.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ken-brill/Sandcastle"
+Repository = "https://github.com/ken-brill/Sandcastle"
+Documentation = "https://github.com/ken-brill/Sandcastle#readme"
+
+[project.scripts]
+sandcastle = "sandcastle_pkg.__main__:main"
+
+[tool.setuptools]
+packages = ["sandcastle_pkg", "sandcastle_pkg.cli", "sandcastle_pkg.utils", "sandcastle_pkg.phase1", "sandcastle_pkg.phase2"]
+
+[tool.setuptools.package-data]
+sandcastle_pkg = ["*.json"]
