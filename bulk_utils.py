@@ -159,7 +159,7 @@ class BulkRecordCreator:
         
         # Ensure logs directory exists and run command from there
         # This ensures bulk result CSV files are created in logs/
-        logs_dir = Path(self.script_dir) / 'logs'
+        logs_dir = Path(__file__).parent / 'logs'
         logs_dir.mkdir(exist_ok=True)
         
         try:
