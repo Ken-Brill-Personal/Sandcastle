@@ -1,0 +1,5 @@
+# SandCastle - Salesforce Sandbox Data Migration Tool
+# Requirements for Python 3.8+
+
+# Terminal formatting and colors
+rich>=13.0.0

@@ -10,8 +10,11 @@ License: MIT License
 Phase 1: Creates Contact with dummy lookups.
 No dependency resolution - just create and save to CSV.
 """
+from rich.console import Console
 from record_utils import filter_record_data, replace_lookups_with_dummies
 from csv_utils import write_record_to_csv
+
+console = Console()
 
 
 def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_fields_info,
@@ -33,19 +36,15 @@ def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_
     """
     # Skip if already created
     if prod_contact_id in created_contacts:
-        print(f"  Contact {prod_contact_id} already created as {created_contacts[prod_contact_id]}")
+        console.print(f"  [dim]Contact {prod_contact_id} already created as {created_contacts[prod_contact_id]}[/dim]")
         return created_contacts[prod_contact_id]
     
-    # ANSI color codes for terminal output
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating Contact {prod_contact_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating Contact {prod_contact_id}")
     
     # Fetch from source
     prod_contact_record = sf_cli_source.get_record('Contact', prod_contact_id)
     if not prod_contact_record:
-        print(f"  ✗ Could not fetch Contact {prod_contact_id} from source org")
+        console.print(f"  [red]✗ Could not fetch Contact {prod_contact_id} from source org[/red]")
         return None
     
     # Save original record for CSV
@@ -75,7 +74,7 @@ def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_
     try:
         sandbox_contact_id = sf_cli_target.create_record('Contact', filtered_data)
         if sandbox_contact_id:
-            print(f"  ✓ Created Contact: {prod_contact_id} → {sandbox_contact_id}")
+            console.print(f"  [green]✓ Created Contact: {prod_contact_id} → {sandbox_contact_id}[/green]")
             created_contacts[prod_contact_id] = sandbox_contact_id
             
             # Save to CSV for Phase 2
@@ -83,12 +82,12 @@ def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_
             
             return sandbox_contact_id
         else:
-            print(f"  ✗ Failed to create Contact {prod_contact_id}")
+            console.print(f"  [red]✗ Failed to create Contact {prod_contact_id}[/red]")
             return None
             
     except Exception as e:
         error_msg = str(e)
-        print(f"  ✗ Error creating Contact {prod_contact_id}: {error_msg}")
+        console.print(f"  [red]✗ Error creating Contact {prod_contact_id}: {error_msg}[/red]")
         
         # Check for duplicate
         if "duplicate value found" in error_msg and "with id:" in error_msg:
@@ -96,7 +95,7 @@ def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_
             match = re.search(r'with id:\s*([a-zA-Z0-9]{15,18})', error_msg)
             if match:
                 existing_id = match.group(1)
-                print(f"  ℹ Found existing Contact {existing_id}, using it")
+                console.print(f"  [blue]ℹ Found existing Contact {existing_id}, using it[/blue]")
                 created_contacts[prod_contact_id] = existing_id
                 
                 # Save to CSV for Phase 2

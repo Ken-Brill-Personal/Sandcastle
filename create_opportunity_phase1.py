@@ -10,8 +10,11 @@ License: MIT License
 Phase 1: Creates Opportunity with dummy lookups.
 Uses bypass RecordType to avoid Flow validation, saves actual RecordType for Phase 2.
 """
+from rich.console import Console
 from record_utils import filter_record_data, replace_lookups_with_dummies
 from csv_utils import write_record_to_csv
+
+console = Console()
 
 
 def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_insertable_fields_info,
@@ -35,19 +38,15 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
     """
     # Skip if already created
     if prod_opp_id in created_opportunities:
-        print(f"  Opportunity {prod_opp_id} already created as {created_opportunities[prod_opp_id]}")
+        console.print(f"  [dim]Opportunity {prod_opp_id} already created as {created_opportunities[prod_opp_id]}[/dim]")
         return created_opportunities[prod_opp_id]
     
-    # ANSI color codes for terminal output
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating Opportunity {prod_opp_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating Opportunity {prod_opp_id}")
     
     # Fetch from source
     prod_opp_record = sf_cli_source.get_record('Opportunity', prod_opp_id)
     if not prod_opp_record:
-        print(f"  ✗ Could not fetch Opportunity {prod_opp_id} from source org")
+        console.print(f"  [red]✗ Could not fetch Opportunity {prod_opp_id} from source org[/red]")
         return None
     
     # Save original record for CSV (including original RecordTypeId)
@@ -74,7 +73,7 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
     bypass_record_type_id = config.get('opportunity_bypass_record_type_id')
     if bypass_record_type_id:
         record_with_dummies['RecordTypeId'] = bypass_record_type_id
-        print(f"  [BYPASS] Using bypass RecordType: {bypass_record_type_id}")
+        console.print(f"  [yellow][BYPASS] Using bypass RecordType: {bypass_record_type_id}[/yellow]")
     
     # Filter to insertable fields and validate picklists
     filtered_data = filter_record_data(
@@ -89,7 +88,7 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
     try:
         sandbox_opp_id = sf_cli_target.create_record('Opportunity', filtered_data)
         if sandbox_opp_id:
-            print(f"  ✓ Created Opportunity: {prod_opp_id} → {sandbox_opp_id}")
+            console.print(f"  [green]✓ Created Opportunity: {prod_opp_id} → {sandbox_opp_id}[/green]")
             created_opportunities[prod_opp_id] = sandbox_opp_id
             
             # Save to CSV for Phase 2 (with original RecordTypeId preserved)
@@ -97,12 +96,12 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
             
             return sandbox_opp_id
         else:
-            print(f"  ✗ Failed to create Opportunity {prod_opp_id}")
+            console.print(f"  [red]✗ Failed to create Opportunity {prod_opp_id}[/red]")
             return None
             
     except Exception as e:
         error_msg = str(e)
-        print(f"  ✗ Error creating Opportunity {prod_opp_id}: {error_msg}")
+        console.print(f"  [red]✗ Error creating Opportunity {prod_opp_id}: {error_msg}[/red]")
         
         # Check for duplicate
         if "duplicate value found" in error_msg and "with id:" in error_msg:
@@ -110,7 +109,7 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
             match = re.search(r'with id:\s*([a-zA-Z0-9]{15,18})', error_msg)
             if match:
                 existing_id = match.group(1)
-                print(f"  ℹ Found existing Opportunity {existing_id}, using it")
+                console.print(f"  [blue]ℹ Found existing Opportunity {existing_id}, using it[/blue]")
                 created_opportunities[prod_opp_id] = existing_id
                 
                 # Save to CSV for Phase 2

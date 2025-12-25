@@ -11,8 +11,11 @@ Phase 1: Creates Account with dummy lookups.
 No dependency resolution - just create and save to CSV.
 """
 import os
+from rich.console import Console
 from record_utils import filter_record_data, replace_lookups_with_dummies
 from csv_utils import write_record_to_csv
+
+console = Console()
 
 
 def create_account_phase1(prod_account_id, created_accounts, account_insertable_fields_info, 
@@ -38,27 +41,23 @@ def create_account_phase1(prod_account_id, created_accounts, account_insertable_
     """
     # Skip if already created
     if prod_account_id in created_accounts:
-        print(f"  Account {prod_account_id} already created as {created_accounts[prod_account_id]}")
+        console.print(f"  [dim]Account {prod_account_id} already created as {created_accounts[prod_account_id]}[/dim]")
         return created_accounts[prod_account_id]
-    
-    # ANSI color codes for terminal output
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
     
     # Display progress counter if available
     if progress_index is not None and total_count is not None:
-        print(f"\n{CYAN}[PHASE 1] [{progress_index} of {total_count}] Creating Account {prod_account_id}{RESET}")
+        console.rule(f"[bold cyan][PHASE 1] [{progress_index} of {total_count}] Creating Account {prod_account_id}")
     else:
-        print(f"\n{CYAN}[PHASE 1] Creating Account {prod_account_id}{RESET}")
+        console.rule(f"[bold cyan][PHASE 1] Creating Account {prod_account_id}")
     
     # Use prefetched record if available, otherwise fetch from source
     if prefetched_record:
         prod_account_record = prefetched_record
-        print(f"  Using prefetched account record")
+        console.print(f"  [dim]Using prefetched account record[/dim]")
     else:
         prod_account_record = sf_cli_source.get_record('Account', prod_account_id)
         if not prod_account_record:
-            print(f"  ✗ Could not fetch Account {prod_account_id} from source org")
+            console.print(f"  [red]✗ Could not fetch Account {prod_account_id} from source org[/red]")
             return None
     
     # Save original record for CSV (before any modifications)
@@ -71,7 +70,7 @@ def create_account_phase1(prod_account_id, created_accounts, account_insertable_
             if dependent_account_id and not isinstance(dependent_account_id, dict):
                 # Recursively create the dependent Account
                 if dependent_account_id not in created_accounts:
-                    print(f"  [DEPENDENCY] Account {prod_account_id} needs {field_name} → {dependent_account_id}")
+                    console.print(f"  [yellow][DEPENDENCY] Account {prod_account_id} needs {field_name} → {dependent_account_id}[/yellow]")
                     # Check if we have this account prefetched
                     dependent_prefetched = None
                     if all_prefetched_accounts and dependent_account_id in all_prefetched_accounts:
@@ -107,7 +106,7 @@ def create_account_phase1(prod_account_id, created_accounts, account_insertable_
     try:
         sandbox_account_id = sf_cli_target.create_record('Account', filtered_data)
         if sandbox_account_id:
-            print(f"  ✓ Created Account: {prod_account_id} → {sandbox_account_id}")
+            console.print(f"  [green]✓ Created Account: {prod_account_id} → {sandbox_account_id}[/green]")
             created_accounts[prod_account_id] = sandbox_account_id
             
             # Save to CSV for Phase 2
@@ -115,12 +114,12 @@ def create_account_phase1(prod_account_id, created_accounts, account_insertable_
             
             return sandbox_account_id
         else:
-            print(f"  ✗ Failed to create Account {prod_account_id}")
+            console.print(f"  [red]✗ Failed to create Account {prod_account_id}[/red]")
             return None
             
     except Exception as e:
         error_msg = str(e)
-        print(f"  ✗ Error creating Account {prod_account_id}: {error_msg}")
+        console.print(f"  [red]✗ Error creating Account {prod_account_id}: {error_msg}[/red]")
         
         # Check for duplicate error with existing ID
         if "duplicate value found" in error_msg and "with id:" in error_msg:
@@ -128,7 +127,7 @@ def create_account_phase1(prod_account_id, created_accounts, account_insertable_
             match = re.search(r'with id:\s*([a-zA-Z0-9]{15,18})', error_msg)
             if match:
                 existing_id = match.group(1)
-                print(f"  ℹ Found existing Account {existing_id}, using it")
+                console.print(f"  [blue]ℹ Found existing Account {existing_id}, using it[/blue]")
                 created_accounts[prod_account_id] = existing_id
                 
                 # Still save to CSV for Phase 2 updates

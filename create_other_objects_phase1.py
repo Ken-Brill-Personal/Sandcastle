@@ -9,23 +9,22 @@ License: MIT License
 
 Phase 1: Creates Quote, Order, QuoteLineItem, OrderItem, and Case with dummy lookups.
 """
+from rich.console import Console
 from record_utils import filter_record_data, replace_lookups_with_dummies, load_insertable_fields
 from csv_utils import write_record_to_csv
+
+console = Console()
 
 def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_cli_target, dummy_records, script_dir):
     """Phase 1: Create Product2 using real values - check if exists in sandbox first"""
     if prod_product_id in created_products:
         return created_products[prod_product_id]
     
-    # ANSI color codes for terminal output
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating Product2 {prod_product_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating Product2 {prod_product_id}")
     
     prod_product_record = sf_cli_source.get_record('Product2', prod_product_id)
     if not prod_product_record:
-        print(f"  ✗ Could not fetch Product2 {prod_product_id}")
+        console.print(f"  [red]✗ Could not fetch Product2 {prod_product_id}[/red]")
         return None
     
     original_record = prod_product_record.copy()
@@ -40,7 +39,7 @@ def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_
         existing = sf_cli_target.query_records(query)
         if existing and len(existing) > 0:
             existing_product_id = existing[0]['Id']
-            print(f"  ✓ Found existing Product2 by ProductCode: {existing_product_id}")
+            console.print(f"  [green]✓ Found existing Product2 by ProductCode: {existing_product_id}[/green]")
     
     if not existing_product_id and product_name:
         # Escape single quotes in name for SOQL
@@ -49,7 +48,7 @@ def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_
         existing = sf_cli_target.query_records(query)
         if existing and len(existing) > 0:
             existing_product_id = existing[0]['Id']
-            print(f"  ✓ Found existing Product2 by Name: {existing_product_id}")
+            console.print(f"  [green]✓ Found existing Product2 by Name: {existing_product_id}[/green]")
     
     if existing_product_id:
         created_products[prod_product_id] = existing_product_id
@@ -86,12 +85,12 @@ def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_
     try:
         sandbox_product_id = sf_cli_target.create_record('Product2', filtered_data)
         if sandbox_product_id:
-            print(f"  ✓ Created Product2: {prod_product_id} → {sandbox_product_id}")
+            console.print(f"  [green]✓ Created Product2: {prod_product_id} → {sandbox_product_id}[/green]")
             created_products[prod_product_id] = sandbox_product_id
             write_record_to_csv('Product2', prod_product_id, sandbox_product_id, original_record, script_dir)
             return sandbox_product_id
     except Exception as e:
-        print(f"  ✗ Error creating Product2 {prod_product_id}: {e}")
+        console.print(f"  [red]✗ Error creating Product2 {prod_product_id}: {e}[/red]")
     
     return None
 
@@ -101,15 +100,11 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
     if prod_pbe_id in created_pbes:
         return created_pbes[prod_pbe_id]
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating PricebookEntry {prod_pbe_id}{RESET}")
+    console.print(f"\n[bold cyan][PHASE 1] Creating PricebookEntry {prod_pbe_id}[/bold cyan]")
     
     prod_pbe_record = sf_cli_source.get_record('PricebookEntry', prod_pbe_id)
     if not prod_pbe_record:
-        print(f"  ✗ Could not fetch PricebookEntry {prod_pbe_id}")
+        console.print(f"  [red]✗ Could not fetch PricebookEntry {prod_pbe_id}[/red]")
         return None
     
     original_record = prod_pbe_record.copy()
@@ -117,7 +112,7 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
     # Get Product2Id from production record
     prod_product_id = prod_pbe_record.get('Product2Id')
     if not prod_product_id:
-        print(f"  ✗ PricebookEntry missing Product2Id")
+        console.print(f"  [red]✗ PricebookEntry missing Product2Id[/red]")
         return None
     
     # Ensure Product2 exists in sandbox (find or create)
@@ -126,7 +121,7 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
     
     sandbox_product_id = created_products.get(prod_product_id)
     if not sandbox_product_id:
-        print(f"  ✗ Could not find or create Product2 for PricebookEntry")
+        console.print(f"  [red]✗ Could not find or create Product2 for PricebookEntry[/red]")
         return None
     
     # Get Pricebook2Id from production record
@@ -137,21 +132,21 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
         standard_pb = sf_cli_target.query_records(standard_pb_query)
         if standard_pb and len(standard_pb) > 0:
             prod_pricebook_id = standard_pb[0]['Id']
-            print(f"  [PRICEBOOK] No Pricebook2Id in production, using Standard Pricebook: {prod_pricebook_id}")
+            console.print(f"  [blue]ℹ [PRICEBOOK] No Pricebook2Id in production, using Standard Pricebook: {prod_pricebook_id}[/blue]")
         else:
-            print(f"  ✗ Could not determine Pricebook for PricebookEntry")
+            console.print(f"  [red]✗ Could not determine Pricebook for PricebookEntry[/red]")
             return None
     else:
-        print(f"  [PRICEBOOK] Using production Pricebook: {prod_pricebook_id}")
+        console.print(f"  [blue]ℹ [PRICEBOOK] Using production Pricebook: {prod_pricebook_id}[/blue]")
     
-    print(f"  [PRODUCT2] Using Product2: {prod_product_id} → {sandbox_product_id}")
+    console.print(f"  [blue]ℹ [PRODUCT2] Using Product2: {prod_product_id} → {sandbox_product_id}[/blue]")
     
     # Check if PricebookEntry already exists for this Product and Pricebook
     existing_pbe_query = f"SELECT Id FROM PricebookEntry WHERE Product2Id = '{sandbox_product_id}' AND Pricebook2Id = '{prod_pricebook_id}' LIMIT 1"
     existing_pbe = sf_cli_target.query_records(existing_pbe_query)
     if existing_pbe and len(existing_pbe) > 0:
         existing_pbe_id = existing_pbe[0]['Id']
-        print(f"  ✓ Found existing PricebookEntry: {existing_pbe_id}")
+        console.print(f"  [green]✓ Found existing PricebookEntry: {existing_pbe_id}[/green]")
         created_pbes[prod_pbe_id] = existing_pbe_id
         write_record_to_csv('PricebookEntry', prod_pbe_id, existing_pbe_id, original_record, script_dir)
         return existing_pbe_id
@@ -198,12 +193,12 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
     try:
         sandbox_pbe_id = sf_cli_target.create_record('PricebookEntry', filtered_data)
         if sandbox_pbe_id:
-            print(f"  ✓ Created PricebookEntry: {prod_pbe_id} → {sandbox_pbe_id}")
+            console.print(f"  [green]✓ Created PricebookEntry: {prod_pbe_id} → {sandbox_pbe_id}[/green]")
             created_pbes[prod_pbe_id] = sandbox_pbe_id
             write_record_to_csv('PricebookEntry', prod_pbe_id, sandbox_pbe_id, original_record, script_dir)
             return sandbox_pbe_id
     except Exception as e:
-        print(f"  ✗ Error creating PricebookEntry {prod_pbe_id}: {e}")
+        console.print(f"  [red]✗ Error creating PricebookEntry {prod_pbe_id}: {e}[/red]")
     
     return None
 
@@ -212,15 +207,11 @@ def create_quote_phase1(prod_quote_id, created_quotes, sf_cli_source, sf_cli_tar
     if prod_quote_id in created_quotes:
         return created_quotes[prod_quote_id]
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating Quote {prod_quote_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating Quote {prod_quote_id}")
     
     prod_quote_record = sf_cli_source.get_record('Quote', prod_quote_id)
     if not prod_quote_record:
-        print(f"  ✗ Could not fetch Quote {prod_quote_id}")
+        console.print(f"  [red]✗ Could not fetch Quote {prod_quote_id}[/red]")
         return None
     
     original_record = prod_quote_record.copy()
@@ -242,17 +233,17 @@ def create_quote_phase1(prod_quote_id, created_quotes, sf_cli_source, sf_cli_tar
     # Ensure Pricebook2Id from production is preserved (all pricebooks exist in sandbox)
     if 'Pricebook2Id' in original_record and original_record['Pricebook2Id']:
         filtered_data['Pricebook2Id'] = original_record['Pricebook2Id']
-        print(f"  [PRICEBOOK] Using production Pricebook: {original_record['Pricebook2Id']}")
+        console.print(f"  [blue]ℹ [PRICEBOOK] Using production Pricebook: {original_record['Pricebook2Id']}[/blue]")
     
     try:
         sandbox_quote_id = sf_cli_target.create_record('Quote', filtered_data)
         if sandbox_quote_id:
-            print(f"  ✓ Created Quote: {prod_quote_id} → {sandbox_quote_id}")
+            console.print(f"  [green]✓ Created Quote: {prod_quote_id} → {sandbox_quote_id}[/green]")
             created_quotes[prod_quote_id] = sandbox_quote_id
             write_record_to_csv('Quote', prod_quote_id, sandbox_quote_id, original_record, script_dir)
             return sandbox_quote_id
     except Exception as e:
-        print(f"  ✗ Error creating Quote {prod_quote_id}: {e}")
+        console.print(f"  [red]✗ Error creating Quote {prod_quote_id}: {e}[/red]")
     
     return None
 
@@ -262,15 +253,11 @@ def create_quote_line_item_phase1(prod_qli_id, created_qlis, sf_cli_source, sf_c
     if prod_qli_id in created_qlis:
         return created_qlis[prod_qli_id]
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating QuoteLineItem {prod_qli_id}{RESET}")
+    console.print(f"\n[bold cyan][PHASE 1] Creating QuoteLineItem {prod_qli_id}[/bold cyan]")
     
     prod_qli_record = sf_cli_source.get_record('QuoteLineItem', prod_qli_id)
     if not prod_qli_record:
-        print(f"  ✗ Could not fetch QuoteLineItem {prod_qli_id}")
+        console.print(f"  [red]✗ Could not fetch QuoteLineItem {prod_qli_id}[/red]")
         return None
     
     original_record = prod_qli_record.copy()
@@ -281,13 +268,13 @@ def create_quote_line_item_phase1(prod_qli_id, created_qlis, sf_cli_source, sf_c
     if prod_quote_id:
         # Ensure parent Quote exists first (don't use dummy)
         if prod_quote_id not in created_quotes:
-            print(f"  [QUOTE] Parent Quote not yet created, creating now: {prod_quote_id}")
+            console.print(f"  [blue]ℹ [QUOTE] Parent Quote not yet created, creating now: {prod_quote_id}[/blue]")
             create_quote_phase1(prod_quote_id, created_quotes, sf_cli_source, sf_cli_target, dummy_records, script_dir)
         
         # Use the real Quote ID from sandbox
         if prod_quote_id in created_quotes:
             sandbox_quote_id = created_quotes[prod_quote_id]
-            print(f"  [QUOTE] Using parent Quote: {prod_quote_id} → {sandbox_quote_id}")
+            console.print(f"  [blue]ℹ [QUOTE] Using parent Quote: {prod_quote_id} → {sandbox_quote_id}[/blue]")
     
     # Handle Product2Id - create if needed
     prod_product_id = prod_qli_record.get('Product2Id')
@@ -320,11 +307,11 @@ def create_quote_line_item_phase1(prod_qli_id, created_qlis, sf_cli_source, sf_c
     # Use created Product2 and PricebookEntry IDs if available
     if prod_product_id and prod_product_id in created_products:
         record_with_dummies['Product2Id'] = created_products[prod_product_id]
-        print(f"  [PRODUCT2] Using created Product2: {prod_product_id} → {created_products[prod_product_id]}")
+        console.print(f"  [blue]ℹ [PRODUCT2] Using created Product2: {prod_product_id} → {created_products[prod_product_id]}[/blue]")
     
     if prod_pbe_id and prod_pbe_id in created_pbes:
         record_with_dummies['PricebookEntryId'] = created_pbes[prod_pbe_id]
-        print(f"  [PBE] Using created PricebookEntry: {prod_pbe_id} → {created_pbes[prod_pbe_id]}")
+        console.print(f"  [blue]ℹ [PBE] Using created PricebookEntry: {prod_pbe_id} → {created_pbes[prod_pbe_id]}[/blue]")
     
     filtered_data = filter_record_data(record_with_dummies, qli_insertable_fields_info, sf_cli_target, 'QuoteLineItem')
     filtered_data.pop('Id', None)
@@ -332,25 +319,25 @@ def create_quote_line_item_phase1(prod_qli_id, created_qlis, sf_cli_source, sf_c
     # Handle negative prices - Salesforce doesn't allow negative UnitPrice
     if 'UnitPrice' in filtered_data and filtered_data['UnitPrice'] is not None:
         if isinstance(filtered_data['UnitPrice'], (int, float)) and filtered_data['UnitPrice'] < 0:
-            print(f"  [PRICE FIX] Converting negative UnitPrice {filtered_data['UnitPrice']} to 0.01")
+            console.print(f"  [yellow]⚠ [PRICE FIX] Converting negative UnitPrice {filtered_data['UnitPrice']} to 0.01[/yellow]")
             filtered_data['UnitPrice'] = 0.01
     
     # Handle negative custom total price fields
     for field_name in ['Custom_Total_Price__c', 'TotalPrice']:
         if field_name in filtered_data and filtered_data[field_name] is not None:
             if isinstance(filtered_data[field_name], (int, float)) and filtered_data[field_name] < 0:
-                print(f"  [PRICE FIX] Converting negative {field_name} {filtered_data[field_name]} to 0")
+                console.print(f"  [yellow]⚠ [PRICE FIX] Converting negative {field_name} {filtered_data[field_name]} to 0[/yellow]")
                 filtered_data[field_name] = 0
     
     try:
         sandbox_qli_id = sf_cli_target.create_record('QuoteLineItem', filtered_data)
         if sandbox_qli_id:
-            print(f"  ✓ Created QuoteLineItem: {prod_qli_id} → {sandbox_qli_id}")
+            console.print(f"  [green]✓ Created QuoteLineItem: {prod_qli_id} → {sandbox_qli_id}[/green]")
             created_qlis[prod_qli_id] = sandbox_qli_id
             write_record_to_csv('QuoteLineItem', prod_qli_id, sandbox_qli_id, original_record, script_dir)
             return sandbox_qli_id
     except Exception as e:
-        print(f"  ✗ Error creating QuoteLineItem {prod_qli_id}: {e}")
+        console.print(f"  [red]✗ Error creating QuoteLineItem {prod_qli_id}: {e}[/red]")
     
     return None
 
@@ -360,15 +347,11 @@ def create_order_phase1(prod_order_id, created_orders, sf_cli_source, sf_cli_tar
     if prod_order_id in created_orders:
         return created_orders[prod_order_id]
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating Order {prod_order_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating Order {prod_order_id}")
     
     prod_order_record = sf_cli_source.get_record('Order', prod_order_id)
     if not prod_order_record:
-        print(f"  ✗ Could not fetch Order {prod_order_id}")
+        console.print(f"  [red]✗ Could not fetch Order {prod_order_id}[/red]")
         return None
     
     original_record = prod_order_record.copy()
@@ -389,17 +372,17 @@ def create_order_phase1(prod_order_id, created_orders, sf_cli_source, sf_cli_tar
     # Ensure Pricebook2Id from production is preserved (all pricebooks exist in sandbox)
     if 'Pricebook2Id' in original_record and original_record['Pricebook2Id']:
         filtered_data['Pricebook2Id'] = original_record['Pricebook2Id']
-        print(f"  [PRICEBOOK] Using production Pricebook: {original_record['Pricebook2Id']}")
+        console.print(f"  [blue]ℹ [PRICEBOOK] Using production Pricebook: {original_record['Pricebook2Id']}[/blue]")
     
     try:
         sandbox_order_id = sf_cli_target.create_record('Order', filtered_data)
         if sandbox_order_id:
-            print(f"  ✓ Created Order: {prod_order_id} → {sandbox_order_id}")
+            console.print(f"  [green]✓ Created Order: {prod_order_id} → {sandbox_order_id}[/green]")
             created_orders[prod_order_id] = sandbox_order_id
             write_record_to_csv('Order', prod_order_id, sandbox_order_id, original_record, script_dir)
             return sandbox_order_id
     except Exception as e:
-        print(f"  ✗ Error creating Order {prod_order_id}: {e}")
+        console.print(f"  [red]✗ Error creating Order {prod_order_id}: {e}[/red]")
     
     return None
 
@@ -409,15 +392,11 @@ def create_order_item_phase1(prod_order_item_id, created_order_items, sf_cli_sou
     if prod_order_item_id in created_order_items:
         return created_order_items[prod_order_item_id]
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating OrderItem {prod_order_item_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating OrderItem {prod_order_item_id}")
     
     prod_order_item_record = sf_cli_source.get_record('OrderItem', prod_order_item_id)
     if not prod_order_item_record:
-        print(f"  ✗ Could not fetch OrderItem {prod_order_item_id}")
+        console.print(f"  [red]✗ Could not fetch OrderItem {prod_order_item_id}[/red]")
         return None
     
     original_record = prod_order_item_record.copy()
@@ -428,13 +407,13 @@ def create_order_item_phase1(prod_order_item_id, created_order_items, sf_cli_sou
     if prod_order_id:
         # Ensure parent Order exists first (don't use dummy)
         if prod_order_id not in created_orders:
-            print(f"  [ORDER] Parent Order not yet created, creating now: {prod_order_id}")
+            console.print(f"  [blue]ℹ [ORDER] Parent Order not yet created, creating now: {prod_order_id}[/blue]")
             create_order_phase1(prod_order_id, created_orders, sf_cli_source, sf_cli_target, dummy_records, script_dir)
         
         # Use the real Order ID from sandbox
         if prod_order_id in created_orders:
             sandbox_order_id = created_orders[prod_order_id]
-            print(f"  [ORDER] Using parent Order: {prod_order_id} → {sandbox_order_id}")
+            console.print(f"  [blue]ℹ [ORDER] Using parent Order: {prod_order_id} → {sandbox_order_id}[/blue]")
     
     # Handle Product2Id - create if needed
     prod_product_id = prod_order_item_record.get('Product2Id')
@@ -466,11 +445,11 @@ def create_order_item_phase1(prod_order_item_id, created_order_items, sf_cli_sou
     # Use created Product2 and PricebookEntry IDs if available
     if prod_product_id and prod_product_id in created_products:
         record_with_dummies['Product2Id'] = created_products[prod_product_id]
-        print(f"  [PRODUCT2] Using created Product2: {prod_product_id} → {created_products[prod_product_id]}")
+        console.print(f"  [blue]ℹ [PRODUCT2] Using created Product2: {prod_product_id} → {created_products[prod_product_id]}[/blue]")
     
     if prod_pbe_id and prod_pbe_id in created_pbes:
         record_with_dummies['PricebookEntryId'] = created_pbes[prod_pbe_id]
-        print(f"  [PBE] Using created PricebookEntry: {prod_pbe_id} → {created_pbes[prod_pbe_id]}")
+        console.print(f"  [blue]ℹ [PBE] Using created PricebookEntry: {prod_pbe_id} → {created_pbes[prod_pbe_id]}[/blue]")
     
     filtered_data = filter_record_data(record_with_dummies, order_item_insertable_fields_info, sf_cli_target, 'OrderItem')
     filtered_data.pop('Id', None)
@@ -478,25 +457,25 @@ def create_order_item_phase1(prod_order_item_id, created_order_items, sf_cli_sou
     # Handle negative prices - Salesforce doesn't allow negative UnitPrice
     if 'UnitPrice' in filtered_data and filtered_data['UnitPrice'] is not None:
         if isinstance(filtered_data['UnitPrice'], (int, float)) and filtered_data['UnitPrice'] < 0:
-            print(f"  [PRICE FIX] Converting negative UnitPrice {filtered_data['UnitPrice']} to 0.01")
+            console.print(f"  [yellow]⚠ [PRICE FIX] Converting negative UnitPrice {filtered_data['UnitPrice']} to 0.01[/yellow]")
             filtered_data['UnitPrice'] = 0.01
     
     # Handle negative custom total price fields
     for field_name in ['Custom_Total_Price__c', 'TotalPrice']:
         if field_name in filtered_data and filtered_data[field_name] is not None:
             if isinstance(filtered_data[field_name], (int, float)) and filtered_data[field_name] < 0:
-                print(f"  [PRICE FIX] Converting negative {field_name} {filtered_data[field_name]} to 0")
+                console.print(f"  [yellow]⚠ [PRICE FIX] Converting negative {field_name} {filtered_data[field_name]} to 0[/yellow]")
                 filtered_data[field_name] = 0
     
     try:
         sandbox_order_item_id = sf_cli_target.create_record('OrderItem', filtered_data)
         if sandbox_order_item_id:
-            print(f"  ✓ Created OrderItem: {prod_order_item_id} → {sandbox_order_item_id}")
+            console.print(f"  [green]✓ Created OrderItem: {prod_order_item_id} → {sandbox_order_item_id}[/green]")
             created_order_items[prod_order_item_id] = sandbox_order_item_id
             write_record_to_csv('OrderItem', prod_order_item_id, sandbox_order_item_id, original_record, script_dir)
             return sandbox_order_item_id
     except Exception as e:
-        print(f"  ✗ Error creating OrderItem {prod_order_item_id}: {e}")
+        console.print(f"  [red]✗ Error creating OrderItem {prod_order_item_id}: {e}[/red]")
     
     return None
 
@@ -506,15 +485,11 @@ def create_case_phase1(prod_case_id, created_cases, sf_cli_source, sf_cli_target
     if prod_case_id in created_cases:
         return created_cases[prod_case_id]
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    
-    print(f"\n{CYAN}[PHASE 1] Creating Case {prod_case_id}{RESET}")
+    console.rule(f"[bold cyan][PHASE 1] Creating Case {prod_case_id}")
     
     prod_case_record = sf_cli_source.get_record('Case', prod_case_id)
     if not prod_case_record:
-        print(f"  ✗ Could not fetch Case {prod_case_id}")
+        console.print(f"  [red]✗ Could not fetch Case {prod_case_id}[/red]")
         return None
     
     original_record = prod_case_record.copy()
@@ -535,11 +510,11 @@ def create_case_phase1(prod_case_id, created_cases, sf_cli_source, sf_cli_target
     try:
         sandbox_case_id = sf_cli_target.create_record('Case', filtered_data)
         if sandbox_case_id:
-            print(f"  ✓ Created Case: {prod_case_id} → {sandbox_case_id}")
+            console.print(f"  [green]✓ Created Case: {prod_case_id} → {sandbox_case_id}[/green]")
             created_cases[prod_case_id] = sandbox_case_id
             write_record_to_csv('Case', prod_case_id, sandbox_case_id, original_record, script_dir)
             return sandbox_case_id
     except Exception as e:
-        print(f"  ✗ Error creating Case {prod_case_id}: {e}")
+        console.print(f"  [red]✗ Error creating Case {prod_case_id}: {e}[/red]")
     
     return None
