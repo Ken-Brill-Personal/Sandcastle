@@ -281,19 +281,18 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
         
         # Handle lookup fields
         if field_type == 'reference':
-            referenc# SAFETY CHECK: Warn if removing a required lookup
-                    if is_required:
-                        console.print(f"  [bold yellow]⚠ REQUIRED LOOKUP: '{field_name}' (→{referenced_object}) not found. Will need dummy or Phase 2 update.[/bold yellow]")
-                    else:
-                        ed_object = field_type_info['referenceTo']
+            referenced_object = field_type_info['referenceTo']
             if referenced_object and value:
-                query =\
-                    f"SELECT Id FROM {referenced_object} WHERE Id = '{value}' LIMIT 1"
+                query = f"SELECT Id FROM {referenced_object} WHERE Id = '{value}' LIMIT 1"
                 existing_referenced_record = sf_cli_target.query_records(query)
                 if existing_referenced_record and len(existing_referenced_record) > 0:
                     filtered_data[field_name] = value
                 else:
-                    print(f"  DEBUG: Skipping lookup field '{field_name}' (value: {value}) because referenced record in {referenced_object} does not exist in target sandbox.")
+                    # SAFETY CHECK: Warn if removing a required lookup
+                    if is_required:
+                        console.print(f"  [bold yellow]⚠ REQUIRED LOOKUP: '{field_name}' (→{referenced_object}) not found. Will need dummy or Phase 2 update.[/bold yellow]")
+                    else:
+                        print(f"  DEBUG: Skipping lookup field '{field_name}' (value: {value}) because referenced record in {referenced_object} does not exist in target sandbox.")
             continue
         if isinstance(value, dict) and 'Id' in value:
             if field_name == 'RecordTypeId':
