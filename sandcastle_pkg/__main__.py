@@ -20,6 +20,8 @@ from glob import glob
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.text import Text
+from rich.align import Align
 
 # Import from package structure
 from sandcastle_pkg.cli import SalesforceCLI
@@ -43,6 +45,55 @@ from sandcastle_pkg.phase2 import update_lookups_phase2
 
 # Get package directory
 PACKAGE_DIR = Path(__file__).parent
+
+
+def show_title_screen():
+    """Display fancy title screen with version and support info."""
+    from sandcastle_pkg import __version__, __author__
+    
+    console = Console()
+    
+    # Create title text
+    title = Text()
+    title.append("🏰 ", style="yellow")
+    title.append("SandCastle", style="bold cyan")
+    title.append(" 🏰", style="yellow")
+    
+    # Create subtitle
+    subtitle = Text()
+    subtitle.append("Salesforce Sandbox Data Migration Tool", style="dim white")
+    
+    # Create version and author info
+    info = Text()
+    info.append(f"Version {__version__}", style="green")
+    info.append(" • ", style="dim")
+    info.append(f"by {__author__}", style="dim")
+    
+    # Create support info
+    support = Text()
+    support.append("📦 GitHub: ", style="dim")
+    support.append("https://github.com/ken-brill/Sandcastle", style="blue underline")
+    
+    # Combine all text
+    content = Text()
+    content.append(title)
+    content.append("\n")
+    content.append(subtitle)
+    content.append("\n\n")
+    content.append(info)
+    content.append("\n")
+    content.append(support)
+    
+    # Create panel
+    panel = Panel(
+        Align.center(content),
+        border_style="cyan",
+        padding=(1, 2)
+    )
+    
+    console.print()
+    console.print(panel)
+    console.print()
 
 
 def create_accounts_phase1(config, account_fields, sf_cli_source, sf_cli_target, dummy_records, script_dir):
@@ -220,6 +271,9 @@ def main():
     # Load config
     with open(config_path, 'r') as f:
         config = json.load(f)
+    
+    # Show title screen
+    show_title_screen()
     
     # Determine source/target aliases
     source_org_alias = args.source_alias or config.get("source_prod_alias")
