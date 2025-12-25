@@ -24,7 +24,7 @@ from rich.panel import Panel
 from salesforce_cli import SalesforceCLI
 
 # Version number - increment with each release
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 from record_utils import load_insertable_fields
 from delete_existing_records import delete_existing_records
 from dummy_records import create_dummy_records
@@ -1018,10 +1018,6 @@ def main():
         console.print()
         console.rule("[bold cyan]PHASE 2: UPDATING LOOKUPS WITH ACTUAL RELATIONSHIPS", style="cyan")
         console.print()
-        
-        logging.info("="*80)
-        logging.info("PHASE 2: UPDATING LOOKUPS WITH ACTUAL RELATIONSHIPS")
-        logging.info("="*80)
         
         created_mappings = {
             'Account': created_accounts,

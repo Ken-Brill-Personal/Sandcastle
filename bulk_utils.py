@@ -356,11 +356,23 @@ def bulk_update_records(sf_cli_target, sobject: str, records: List[Dict[str, Any
         # Id must be first column
         fieldnames = ['Id'] + sorted([f for f in all_fields if f != 'Id'])
         
+        # Sanitize records: remove embedded newlines from field values
+        sanitized_records = []
+        for record in records:
+            sanitized = {}
+            for key, value in record.items():
+                if isinstance(value, str):
+                    # Replace any newline characters with spaces
+                    sanitized[key] = value.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+                else:
+                    sanitized[key] = value
+            sanitized_records.append(sanitized)
+        
         # Write CSV with LF line endings initially
         with open(csv_file, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
             writer.writeheader()
-            writer.writerows(records)
+            writer.writerows(sanitized_records)
         
         # Convert line endings to CRLF (Salesforce Bulk API requirement)
         with open(csv_file, 'rb') as f:

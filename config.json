@@ -6,11 +6,11 @@
   "opportunity_bypass_record_type_id": "012Sv000003wIinIAE",
   "delete_existing_records": true,
   "creation_order": ["Account", "Contact", "Opportunity", "Quote","QuoteLineItem","Order","OrderItem","Case","AccountRelationship"],
-  "contact_limit": 20,
-  "locations_limit": 25,
-  "case_limit": 20,
-  "order_limit": 20,
-  "quote_limit": 20,
+  "contact_limit": 10,
+  "locations_limit": 10,
+  "case_limit": 10,
+  "order_limit": 10,
+  "quote_limit": 10,
   "account_relationship_limit": -1,
-  "opportunity_limit": 20
+  "opportunity_limit": 10
 }

@@ -9,7 +9,8 @@ License: MIT License
 
 Phase 1: Creates Quote, Order, QuoteLineItem, OrderItem, and Case with dummy lookups.
 """
-from rich.console import Console
+from rich.console import Console, Group
+from rich.panel import Panel
 from record_utils import filter_record_data, replace_lookups_with_dummies, load_insertable_fields
 from csv_utils import write_record_to_csv
 
@@ -24,22 +25,24 @@ def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_
     
     prod_product_record = sf_cli_source.get_record('Product2', prod_product_id)
     if not prod_product_record:
-        console.print(f"  [red]✗ Could not fetch Product2 {prod_product_id}[/red]")
+        console.print(f"[red]✗ Could not fetch Product2 {prod_product_id}[/red]\n")
         return None
     
     original_record = prod_product_record.copy()
     
-    # Try to find existing product in sandbox by ProductCode or Name
-    product_code = prod_product_record.get('ProductCode')
-    product_name = prod_product_record.get('Name')
-    
-    existing_product_id = None
-    if product_code:
-        query = f"SELECT Id FROM Product2 WHERE ProductCode = '{product_code}' LIMIT 1"
-        existing = sf_cli_target.query_records(query)
-        if existing and len(existing) > 0:
-            existing_product_id = existing[0]['Id']
-            console.print(f"  [green]✓ Found existing Product2 by ProductCode: {existing_product_id}[/green]")
+    # Capture processing output
+    with console.capture() as capture:
+        # Try to find existing product in sandbox by ProductCode or Name
+        product_code = prod_product_record.get('ProductCode')
+        product_name = prod_product_record.get('Name')
+        
+        existing_product_id = None
+        if product_code:
+            query = f"SELECT Id FROM Product2 WHERE ProductCode = '{product_code}' LIMIT 1"
+            existing = sf_cli_target.query_records(query)
+            if existing and len(existing) > 0:
+                existing_product_id = existing[0]['Id']
+                console.print(f"  [green]✓ Found existing Product2 by ProductCode: {existing_product_id}[/green]")
     
     if not existing_product_id and product_name:
         # Escape single quotes in name for SOQL
@@ -104,15 +107,17 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
     
     prod_pbe_record = sf_cli_source.get_record('PricebookEntry', prod_pbe_id)
     if not prod_pbe_record:
-        console.print(f"  [red]✗ Could not fetch PricebookEntry {prod_pbe_id}[/red]")
+        console.print(f"[red]✗ Could not fetch PricebookEntry {prod_pbe_id}[/red]\n")
         return None
     
     original_record = prod_pbe_record.copy()
     
-    # Get Product2Id from production record
-    prod_product_id = prod_pbe_record.get('Product2Id')
-    if not prod_product_id:
-        console.print(f"  [red]✗ PricebookEntry missing Product2Id[/red]")
+    # Capture processing output
+    with console.capture() as capture:
+        # Get Product2Id from production record
+        prod_product_id = prod_pbe_record.get('Product2Id')
+        if not prod_product_id:
+            console.print(f"  [red]✗ PricebookEntry missing Product2Id[/red]")
         return None
     
     # Ensure Product2 exists in sandbox (find or create)
@@ -316,6 +321,11 @@ def create_quote_line_item_phase1(prod_qli_id, created_qlis, sf_cli_source, sf_c
     filtered_data = filter_record_data(record_with_dummies, qli_insertable_fields_info, sf_cli_target, 'QuoteLineItem')
     filtered_data.pop('Id', None)
     
+    # CRITICAL: Ensure PricebookEntryId is present (required field)
+    # Re-add after filtering in case it was removed
+    if prod_pbe_id and prod_pbe_id in created_pbes:
+        filtered_data['PricebookEntryId'] = created_pbes[prod_pbe_id]
+    
     # Handle negative prices - Salesforce doesn't allow negative UnitPrice
     if 'UnitPrice' in filtered_data and filtered_data['UnitPrice'] is not None:
         if isinstance(filtered_data['UnitPrice'], (int, float)) and filtered_data['UnitPrice'] < 0:
@@ -357,32 +367,39 @@ def create_order_phase1(prod_order_id, created_orders, sf_cli_source, sf_cli_tar
     original_record = prod_order_record.copy()
     order_insertable_fields_info = load_insertable_fields('Order', script_dir)
     
-    created_mappings = {
-        'Account': created_accounts or {},
-        'Contact': created_contacts or {},
-        'Order': created_orders
-    }
-    record_with_dummies = replace_lookups_with_dummies(
-        prod_order_record, order_insertable_fields_info, dummy_records, created_mappings,
-        sf_cli_source, sf_cli_target, 'Order'
-    )
-    filtered_data = filter_record_data(record_with_dummies, order_insertable_fields_info, sf_cli_target, 'Order')
-    filtered_data.pop('Id', None)
+    # Capture all intermediate output
+    with console.capture() as capture:
+        created_mappings = {
+            'Account': created_accounts or {},
+            'Contact': created_contacts or {},
+            'Order': created_orders
+        }
+        record_with_dummies = replace_lookups_with_dummies(
+            prod_order_record, order_insertable_fields_info, dummy_records, created_mappings,
+            sf_cli_source, sf_cli_target, 'Order'
+        )
+        filtered_data = filter_record_data(record_with_dummies, order_insertable_fields_info, sf_cli_target, 'Order')
+        filtered_data.pop('Id', None)
+        
+        # Ensure Pricebook2Id from production is preserved (all pricebooks exist in sandbox)
+        if 'Pricebook2Id' in original_record and original_record['Pricebook2Id']:
+            filtered_data['Pricebook2Id'] = original_record['Pricebook2Id']
+            console.print(f"  [blue]ℹ [PRICEBOOK] Using production Pricebook: {original_record['Pricebook2Id']}[/blue]")
     
-    # Ensure Pricebook2Id from production is preserved (all pricebooks exist in sandbox)
-    if 'Pricebook2Id' in original_record and original_record['Pricebook2Id']:
-        filtered_data['Pricebook2Id'] = original_record['Pricebook2Id']
-        console.print(f"  [blue]ℹ [PRICEBOOK] Using production Pricebook: {original_record['Pricebook2Id']}[/blue]")
+    # Display captured output in a panel if there's content
+    captured_text = capture.get().strip()
+    if captured_text:
+        console.print(Panel(captured_text, title="[dim]Processing Details[/dim]", border_style="dim", padding=(0, 1)))
     
     try:
         sandbox_order_id = sf_cli_target.create_record('Order', filtered_data)
         if sandbox_order_id:
-            console.print(f"  [green]✓ Created Order: {prod_order_id} → {sandbox_order_id}[/green]")
+            console.print(f"[green]✓ Successfully created Order with ID: {sandbox_order_id}[/green]\n")
             created_orders[prod_order_id] = sandbox_order_id
             write_record_to_csv('Order', prod_order_id, sandbox_order_id, original_record, script_dir)
             return sandbox_order_id
     except Exception as e:
-        console.print(f"  [red]✗ Error creating Order {prod_order_id}: {e}[/red]")
+        console.print(f"[red]✗ Error creating Order {prod_order_id}: {e}[/red]\n")
     
     return None
 

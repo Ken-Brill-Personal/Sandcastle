@@ -380,13 +380,20 @@ class SalesforceCLI:
             logs_dir = Path(__file__).parent / 'logs'
             logs_dir.mkdir(exist_ok=True)
             
-            # Do not add --json, as this command may not support it
-            result = subprocess.run(['sf'] + command, capture_output=True, text=True, timeout=660, cwd=str(logs_dir))  # 11 minute timeout
+            # Run command and suppress verbose output (capture stderr only for errors)
+            result = subprocess.run(
+                ['sf'] + command, 
+                text=True, 
+                timeout=660,  # 11 minute timeout
+                cwd=str(logs_dir),
+                stdout=subprocess.DEVNULL,  # Suppress verbose batch status output
+                stderr=subprocess.PIPE  # Capture errors only
+            )
             os.remove(temp_csv_path)
             if result.returncode == 0:
-                return {'success': True, 'message': f"Bulk delete for {sobject_type} completed.", 'stdout': result.stdout}
+                return {'success': True, 'message': f"Bulk delete for {sobject_type} completed."}
             else:
-                return {'success': False, 'message': f"Bulk delete failed: {result.stderr}", 'stdout': result.stdout}
+                return {'success': False, 'message': f"Bulk delete failed: {result.stderr}"}
         except Exception as e:
             if os.path.exists(temp_csv_path):
                 os.remove(temp_csv_path)

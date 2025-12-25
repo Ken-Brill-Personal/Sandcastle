@@ -11,6 +11,7 @@ Phase 1: Creates Opportunity with dummy lookups.
 Uses bypass RecordType to avoid Flow validation, saves actual RecordType for Phase 2.
 """
 from rich.console import Console
+from rich.panel import Panel
 from record_utils import filter_record_data, replace_lookups_with_dummies
 from csv_utils import write_record_to_csv
 
@@ -46,49 +47,56 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
     # Fetch from source
     prod_opp_record = sf_cli_source.get_record('Opportunity', prod_opp_id)
     if not prod_opp_record:
-        console.print(f"  [red]✗ Could not fetch Opportunity {prod_opp_id} from source org[/red]")
+        console.print(f"[red]✗ Could not fetch Opportunity {prod_opp_id} from source org[/red]\n")
         return None
     
     # Save original record for CSV (including original RecordTypeId)
     original_record = prod_opp_record.copy()
     
-    # Replace lookups with dummy IDs or real IDs if available
-    created_mappings = {
-        'Account': created_accounts or {},
-        'Contact': created_contacts or {},
-        'Opportunity': created_opportunities
-    }
-    record_with_dummies = replace_lookups_with_dummies(
-        prod_opp_record,
-        opportunity_insertable_fields_info,
-        dummy_records,
-        created_mappings,
-        sf_cli_source,
-        sf_cli_target,
-        'Opportunity'
-    )
+    # Capture processing output
+    with console.capture() as capture:
+        # Replace lookups with dummy IDs or real IDs if available
+        created_mappings = {
+            'Account': created_accounts or {},
+            'Contact': created_contacts or {},
+            'Opportunity': created_opportunities
+        }
+        record_with_dummies = replace_lookups_with_dummies(
+            prod_opp_record,
+            opportunity_insertable_fields_info,
+            dummy_records,
+            created_mappings,
+            sf_cli_source,
+            sf_cli_target,
+            'Opportunity'
+        )
+        
+        # Get bypass RecordType from config (if available)
+        # this lets us get past the flow: Opportunity - On create set stage depending on Tracking checkpoint
+        bypass_record_type_id = config.get('opportunity_bypass_record_type_id')
+        if bypass_record_type_id:
+            record_with_dummies['RecordTypeId'] = bypass_record_type_id
+            console.print(f"  [yellow][BYPASS] Using bypass RecordType: {bypass_record_type_id}[/yellow]")
+        
+        # Filter to insertable fields and validate picklists
+        filtered_data = filter_record_data(
+            record_with_dummies,
+            opportunity_insertable_fields_info,
+            sf_cli_target,
+            'Opportunity'
+        )
+        filtered_data.pop('Id', None)
     
-    # Get bypass RecordType from config (if available)
-    # this lets us get past the flow: Opportunity - On create set stage depending on Tracking checkpoint
-    bypass_record_type_id = config.get('opportunity_bypass_record_type_id')
-    if bypass_record_type_id:
-        record_with_dummies['RecordTypeId'] = bypass_record_type_id
-        console.print(f"  [yellow][BYPASS] Using bypass RecordType: {bypass_record_type_id}[/yellow]")
-    
-    # Filter to insertable fields and validate picklists
-    filtered_data = filter_record_data(
-        record_with_dummies,
-        opportunity_insertable_fields_info,
-        sf_cli_target,
-        'Opportunity'
-    )
-    filtered_data.pop('Id', None)
+    # Display captured output in panel
+    captured_text = capture.get().strip()
+    if captured_text:
+        console.print(Panel(captured_text, title="[dim]Processing Details[/dim]", border_style="dim", padding=(0, 1)))
     
     # Create in sandbox
     try:
         sandbox_opp_id = sf_cli_target.create_record('Opportunity', filtered_data)
         if sandbox_opp_id:
-            console.print(f"  [green]✓ Created Opportunity: {prod_opp_id} → {sandbox_opp_id}[/green]")
+            console.print(f"[green]✓ Successfully created Opportunity with ID: {sandbox_opp_id}[/green]\n")
             created_opportunities[prod_opp_id] = sandbox_opp_id
             
             # Save to CSV for Phase 2 (with original RecordTypeId preserved)
@@ -96,12 +104,12 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
             
             return sandbox_opp_id
         else:
-            console.print(f"  [red]✗ Failed to create Opportunity {prod_opp_id}[/red]")
+            console.print(f"[red]✗ Failed to create Opportunity {prod_opp_id}[/red]\n")
             return None
             
     except Exception as e:
         error_msg = str(e)
-        console.print(f"  [red]✗ Error creating Opportunity {prod_opp_id}: {error_msg}[/red]")
+        console.print(f"[red]✗ Error creating Opportunity {prod_opp_id}: {error_msg}[/red]\n")
         
         # Check for duplicate
         if "duplicate value found" in error_msg and "with id:" in error_msg:
