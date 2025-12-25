@@ -48,18 +48,29 @@ This tool is designed to populate development sandboxes with production-like dat
 
 ### Installation
 
-1. Clone the repository:
+**Option 1: Install from GitHub (Recommended)**
 ```bash
-git clone <repository-url>
-cd sfDemoRecords
+pip install git+https://github.com/ken-brill/Sandcastle.git
 ```
 
-2. Install required Python packages:
+**Option 2: Clone and Install Locally**
 ```bash
+git clone https://github.com/ken-brill/Sandcastle.git
+cd Sandcastle
+pip install -e .
+```
+
+**Option 3: Development (Run Without Installing)**
+```bash
+git clone https://github.com/ken-brill/Sandcastle.git
+cd Sandcastle
 pip install -r requirements.txt
+python -m sandcastle_pkg
 ```
 
-3. Authenticate with Salesforce CLI:
+### Salesforce CLI Authentication
+
+Authenticate with both source and target orgs:
 ```bash
 sf org login web --alias PROD
 sf org login web --alias DEV_SANDBOX
@@ -67,7 +78,7 @@ sf org login web --alias DEV_SANDBOX
 
 ### Configuration
 
-1. Copy and edit `config.json`:
+Create a `config.json` file in your current directory (or use `--config path/to/config.json`):
 ```json
 {
   "source_prod_alias": "PROD",
@@ -83,27 +94,28 @@ sf org login web --alias DEV_SANDBOX
 }
 ```
 
-2. Configure object limits:
-   - Set to `-1` for unlimited records
-   - Set to `0` to skip that object type
-   - Set to a number to limit records per account
+Configure object limits:
+- Set to `-1` for unlimited records
+- Set to `0` to skip that object type
+- Set to a number to limit records per account
 
 ### Usage
 
-Run the migration:
+**If installed via pip:**
 ```bash
-cd Sandcastle
-python sandcastle.py
+sandcastle
 ```
 
-Skip deletion (if you want to keep existing data):
+**With options:**
 ```bash
-python sandcastle.py --no-delete
+sandcastle --config my-config.json
+sandcastle --no-delete
+sandcastle -s PROD -t MY_SANDBOX
 ```
 
-Specify custom org aliases:
+**If running from source (development):**
 ```bash
-python sandcastle.py -s PROD -t MY_SANDBOX
+python -m sandcastle_pkg
 ```
 
 ## 🏗️ How It Works
