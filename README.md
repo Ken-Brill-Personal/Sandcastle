@@ -93,7 +93,14 @@ sf org login web --alias DEV_SANDBOX
 
 ### Configuration
 
-Create a `config.json` file in your current directory (or use `--config path/to/config.json`):
+Create a `Sandcastle.json` file in your home directory (or use `--config path/to/Sandcastle.json`):
+```bash
+# Create config in home directory
+cp config.json ~/Sandcastle.json
+# Or create from scratch
+nano ~/Sandcastle.json
+```
+
 ```json
 {
   "source_prod_alias": "PROD",
@@ -118,13 +125,19 @@ Configure object limits:
 
 **If installed via pip:**
 ```bash
+# Reads from ~/Sandcastle.json by default
 sandcastle
 ```
 
 **With options:**
 ```bash
-sandcastle --config my-config.json
+# Use custom config location
+sandcastle --config /path/to/my-config.json
+
+# Skip deletion step
 sandcastle --no-delete
+
+# Override org aliases from command line
 sandcastle -s PROD -t MY_SANDBOX
 ```
 
@@ -195,7 +208,7 @@ Total execution time: 18m 42s
 
 ## 🔧 Configuration Options
 
-### config.json Settings
+### Sandcastle.json Settings
 
 | Setting | Description | Default |
 |---------|-------------|---------|
@@ -223,7 +236,7 @@ Total execution time: 18m 42s
 sfDemoRecords/
 ├── Sandcastle/
 │   ├── sandcastle.py                # Main migration script
-│   ├── config.json                  # Configuration file
+│   ├── Sandcastle.json              # Configuration file (in home directory)
 │   ├── salesforce_cli.py            # Salesforce CLI wrapper
 │   ├── bulk_utils.py                # Bulk API utilities
 │   ├── record_utils.py              # Record transformation
@@ -243,7 +256,7 @@ sfDemoRecords/
 ## 🐛 Troubleshooting
 
 ### "Duplicate value found" errors
-- Ensure `delete_existing_records: true` in config.json
+- Ensure `delete_existing_records: true` in ~/Sandcastle.json
 - Portal users may block deletion - they'll be preserved and reused
 
 ### "RecordType not found" errors
