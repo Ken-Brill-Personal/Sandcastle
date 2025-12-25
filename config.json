@@ -1,0 +1,16 @@
+{
+  "target_sandbox_alias": "kbrill",
+  "source_prod_alias": "DIVE",
+  "sfdx_project_dir": "../KBRILL", 
+  "Accounts": ["0014U00003NPdH5QAL", "0014U00002qXYUJQA4"],
+  "opportunity_bypass_record_type_id": "012Sv000003wIinIAE",
+  "delete_existing_records": true,
+  "creation_order": ["Account", "Contact", "Opportunity", "Quote","QuoteLineItem","Order","OrderItem","Case","AccountRelationship"],
+  "contact_limit": 20,
+  "locations_limit": 25,
+  "case_limit": 20,
+  "order_limit": 20,
+  "quote_limit": 20,
+  "account_relationship_limit": -1,
+  "opportunity_limit": 20
+}
