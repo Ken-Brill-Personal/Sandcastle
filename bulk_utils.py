@@ -157,13 +157,19 @@ class BulkRecordCreator:
             '--json'
         ]
         
+        # Ensure logs directory exists and run command from there
+        # This ensures bulk result CSV files are created in logs/
+        logs_dir = Path(self.script_dir) / 'logs'
+        logs_dir.mkdir(exist_ok=True)
+        
         try:
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
                 timeout=600,  # 10 minute timeout
-                check=False
+                check=False,
+                cwd=str(logs_dir)  # Run from logs directory
             )
         except subprocess.TimeoutExpired as e:
             raise Exception(f"Bulk create timed out after 10 minutes") from e

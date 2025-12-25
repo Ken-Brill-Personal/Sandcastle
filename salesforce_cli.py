@@ -374,8 +374,14 @@ class SalesforceCLI:
             ]
             if self.target_org:
                 command.extend(['--target-org', self.target_org])
+            
+            # Ensure logs directory exists and run command from there
+            # This ensures bulk result CSV files are created in logs/
+            logs_dir = Path(__file__).parent / 'logs'
+            logs_dir.mkdir(exist_ok=True)
+            
             # Do not add --json, as this command may not support it
-            result = subprocess.run(['sf'] + command, capture_output=True, text=True, timeout=660)  # 11 minute timeout
+            result = subprocess.run(['sf'] + command, capture_output=True, text=True, timeout=660, cwd=str(logs_dir))  # 11 minute timeout
             os.remove(temp_csv_path)
             if result.returncode == 0:
                 return {'success': True, 'message': f"Bulk delete for {sobject_type} completed.", 'stdout': result.stdout}
