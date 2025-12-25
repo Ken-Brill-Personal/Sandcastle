@@ -36,7 +36,11 @@ def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_
         print(f"  Contact {prod_contact_id} already created as {created_contacts[prod_contact_id]}")
         return created_contacts[prod_contact_id]
     
-    print(f"\n[PHASE 1] Creating Contact {prod_contact_id}")
+    # ANSI color codes for terminal output
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating Contact {prod_contact_id}{RESET}")
     
     # Fetch from source
     prod_contact_record = sf_cli_source.get_record('Contact', prod_contact_id)

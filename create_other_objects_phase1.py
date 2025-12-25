@@ -17,7 +17,11 @@ def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_
     if prod_product_id in created_products:
         return created_products[prod_product_id]
     
-    print(f"\n[PHASE 1] Creating Product2 {prod_product_id}")
+    # ANSI color codes for terminal output
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating Product2 {prod_product_id}{RESET}")
     
     prod_product_record = sf_cli_source.get_record('Product2', prod_product_id)
     if not prod_product_record:
@@ -97,7 +101,11 @@ def create_pricebook_entry_phase1(prod_pbe_id, created_pbes, sf_cli_source, sf_c
     if prod_pbe_id in created_pbes:
         return created_pbes[prod_pbe_id]
     
-    print(f"\n[PHASE 1] Creating PricebookEntry {prod_pbe_id}")
+    # ANSI color codes
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating PricebookEntry {prod_pbe_id}{RESET}")
     
     prod_pbe_record = sf_cli_source.get_record('PricebookEntry', prod_pbe_id)
     if not prod_pbe_record:
@@ -204,7 +212,11 @@ def create_quote_phase1(prod_quote_id, created_quotes, sf_cli_source, sf_cli_tar
     if prod_quote_id in created_quotes:
         return created_quotes[prod_quote_id]
     
-    print(f"\n[PHASE 1] Creating Quote {prod_quote_id}")
+    # ANSI color codes
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating Quote {prod_quote_id}{RESET}")
     
     prod_quote_record = sf_cli_source.get_record('Quote', prod_quote_id)
     if not prod_quote_record:
@@ -250,7 +262,11 @@ def create_quote_line_item_phase1(prod_qli_id, created_qlis, sf_cli_source, sf_c
     if prod_qli_id in created_qlis:
         return created_qlis[prod_qli_id]
     
-    print(f"\n[PHASE 1] Creating QuoteLineItem {prod_qli_id}")
+    # ANSI color codes
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating QuoteLineItem {prod_qli_id}{RESET}")
     
     prod_qli_record = sf_cli_source.get_record('QuoteLineItem', prod_qli_id)
     if not prod_qli_record:
@@ -344,7 +360,11 @@ def create_order_phase1(prod_order_id, created_orders, sf_cli_source, sf_cli_tar
     if prod_order_id in created_orders:
         return created_orders[prod_order_id]
     
-    print(f"\n[PHASE 1] Creating Order {prod_order_id}")
+    # ANSI color codes
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating Order {prod_order_id}{RESET}")
     
     prod_order_record = sf_cli_source.get_record('Order', prod_order_id)
     if not prod_order_record:
@@ -389,7 +409,11 @@ def create_order_item_phase1(prod_order_item_id, created_order_items, sf_cli_sou
     if prod_order_item_id in created_order_items:
         return created_order_items[prod_order_item_id]
     
-    print(f"\n[PHASE 1] Creating OrderItem {prod_order_item_id}")
+    # ANSI color codes
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating OrderItem {prod_order_item_id}{RESET}")
     
     prod_order_item_record = sf_cli_source.get_record('OrderItem', prod_order_item_id)
     if not prod_order_item_record:
@@ -482,7 +506,11 @@ def create_case_phase1(prod_case_id, created_cases, sf_cli_source, sf_cli_target
     if prod_case_id in created_cases:
         return created_cases[prod_case_id]
     
-    print(f"\n[PHASE 1] Creating Case {prod_case_id}")
+    # ANSI color codes
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating Case {prod_case_id}{RESET}")
     
     prod_case_record = sf_cli_source.get_record('Case', prod_case_id)
     if not prod_case_record:

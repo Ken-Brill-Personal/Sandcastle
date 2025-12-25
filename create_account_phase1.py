@@ -41,11 +41,15 @@ def create_account_phase1(prod_account_id, created_accounts, account_insertable_
         print(f"  Account {prod_account_id} already created as {created_accounts[prod_account_id]}")
         return created_accounts[prod_account_id]
     
+    # ANSI color codes for terminal output
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
     # Display progress counter if available
     if progress_index is not None and total_count is not None:
-        print(f"\n[PHASE 1] [{progress_index} of {total_count}] Creating Account {prod_account_id}")
+        print(f"\n{CYAN}[PHASE 1] [{progress_index} of {total_count}] Creating Account {prod_account_id}{RESET}")
     else:
-        print(f"\n[PHASE 1] Creating Account {prod_account_id}")
+        print(f"\n{CYAN}[PHASE 1] Creating Account {prod_account_id}{RESET}")
     
     # Use prefetched record if available, otherwise fetch from source
     if prefetched_record:

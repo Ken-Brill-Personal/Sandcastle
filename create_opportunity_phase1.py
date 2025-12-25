@@ -38,7 +38,11 @@ def create_opportunity_phase1(prod_opp_id, created_opportunities, opportunity_in
         print(f"  Opportunity {prod_opp_id} already created as {created_opportunities[prod_opp_id]}")
         return created_opportunities[prod_opp_id]
     
-    print(f"\n[PHASE 1] Creating Opportunity {prod_opp_id}")
+    # ANSI color codes for terminal output
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+    
+    print(f"\n{CYAN}[PHASE 1] Creating Opportunity {prod_opp_id}{RESET}")
     
     # Fetch from source
     prod_opp_record = sf_cli_source.get_record('Opportunity', prod_opp_id)
