@@ -358,9 +358,9 @@ def main():
                     logging.info(f"\n--- Phase 1: Contacts for Account {prod_account_id[:8]}... ({len(contacts)}) ---")
                     for idx, contact_rec in enumerate(contacts, 1):
                         prod_id = contact_rec['Id']
-                        create_contact_phase1(prod_id, created_contacts, sf_cli_source, sf_cli_target, 
-                                            dummy_records, script_dir, created_accounts, 
-                                            progress=(idx, len(contacts)))
+                        create_contact_phase1(prod_id, created_contacts, contact_fields, 
+                                            sf_cli_source, sf_cli_target, dummy_records, 
+                                            script_dir, created_accounts)
         
         if config.get("opportunity_limit", 0) != 0:
             for prod_account_id in config["Accounts"]:
@@ -373,10 +373,9 @@ def main():
                     logging.info(f"\n--- Phase 1: Opportunities for Account {prod_account_id[:8]}... ({len(opps)}) ---")
                     for idx, opp_rec in enumerate(opps, 1):
                         prod_id = opp_rec['Id']
-                        create_opportunity_phase1(prod_id, created_opportunities, sf_cli_source, 
-                                                sf_cli_target, dummy_records, script_dir, 
-                                                created_accounts, created_contacts, config,
-                                                progress=(idx, len(opps)))
+                        create_opportunity_phase1(prod_id, created_opportunities, opportunity_fields, 
+                                                sf_cli_source, sf_cli_target, dummy_records, 
+                                                script_dir, config, created_accounts, created_contacts)
         
         # Create Quotes and QuoteLineItems
         if config.get("quote_limit", 0) != 0 and created_opportunities:
