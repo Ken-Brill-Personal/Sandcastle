@@ -15,6 +15,9 @@ License: MIT License
 """
 
 import logging
+from rich.console import Console
+
+console = Console()
 
 
 def update_lookups_phase2(sf_cli_source, sf_cli_target, script_dir, insertable_fields_info, created_mappings, object_type, dummy_records):
@@ -186,4 +189,6 @@ def update_lookups_phase2(sf_cli_source, sf_cli_target, script_dir, insertable_f
                     logging.warning(f"  ✗ Error updating {sandbox_id}: {e}")
                     error_count += 1
     
+    # Display summary with green success message
+    console.print(f"  [green]✓ {object_type} Phase 2 Summary: {update_count} updated, {skip_count} skipped, {error_count} errors[/green]")
     logging.info(f"  {object_type} Phase 2 Summary: {update_count} updated, {skip_count} skipped, {error_count} errors")

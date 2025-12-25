@@ -14,10 +14,17 @@ import os
 import json
 import argparse
 import logging
+import time
 from pathlib import Path
 from datetime import datetime
 from glob import glob
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
 from salesforce_cli import SalesforceCLI
+
+# Version number - increment with each release
+VERSION = "1.0.0"
 from record_utils import load_insertable_fields
 from delete_existing_records import delete_existing_records
 from dummy_records import create_dummy_records
@@ -453,8 +460,22 @@ def setup_logging(script_dir):
             logging.StreamHandler()
         ]
     )
+    
+    # Rich console banner
+    console = Console()
+    console.print()
+    console.print(Panel.fit(
+        f"[bold cyan]🏰 SandCastle[/bold cyan]\n"
+        f"[dim]Two-Phase Salesforce Data Migration[/dim]\n\n"
+        f"[white]Version {VERSION}[/white]",
+        border_style="cyan",
+        padding=(1, 2)
+    ))
+    console.print()
+    
+    # Also log to file
     logging.info("=" * 80)
-    logging.info("Starting Salesforce Data Population Script (v2 - Optimized)")
+    logging.info(f"Starting SandCastle v{VERSION}")
     logging.info("=" * 80)
     return log_file
 
@@ -539,7 +560,15 @@ def main():
     sf_cli_source = SalesforceCLI(target_org=source_org_alias)
     sf_cli_target = SalesforceCLI(target_org=target_org_alias)
     
-    logging.info("\n" + "="*80)
+    # Rich console output
+    console = Console()
+    console.rule("[bold cyan]TWO-PHASE DATA MIGRATION", style="cyan")
+    console.print(f"[cyan]Source:[/cyan] [bold white]{source_org_alias}[/bold white]")
+    console.print(f"[cyan]Target:[/cyan] [bold white]{target_org_alias}[/bold white]")
+    console.print()
+    
+    # Also log to file
+    logging.info("="*80)
     logging.info("TWO-PHASE DATA MIGRATION")
     logging.info("="*80)
     logging.info(f"Source: {source_org_alias}")
@@ -558,6 +587,7 @@ def main():
             logging.error(f"\nSource and target are the SAME org. Aborting.")
             return
         
+        console.print(f"[green]✓ Safety checks passed[/green]")
         logging.info(f"✓ Safety checks passed")
         
         # Delete existing records if not skipped
@@ -598,7 +628,7 @@ def main():
         created_account_relationships = {}
         
         # ========== PHASE 1: CREATE WITH DUMMY LOOKUPS ==========
-        logging.info("\n" + "="*80)
+        logging.info("="*80)
         logging.info("PHASE 1: CREATING RECORDS WITH DUMMY LOOKUPS")
         logging.info("="*80)
         
@@ -984,7 +1014,12 @@ def main():
                                              dummy_records, script_dir, created_accounts, created_contacts)
         
         # ========== PHASE 2: UPDATE LOOKUPS ==========
-        logging.info("\n" + "="*80)
+        console = Console()
+        console.print()
+        console.rule("[bold cyan]PHASE 2: UPDATING LOOKUPS WITH ACTUAL RELATIONSHIPS", style="cyan")
+        console.print()
+        
+        logging.info("="*80)
         logging.info("PHASE 2: UPDATING LOOKUPS WITH ACTUAL RELATIONSHIPS")
         logging.info("="*80)
         
@@ -1031,9 +1066,16 @@ def main():
         # They don't need Phase 2 updates
         
         # ========== SUMMARY ==========
-        logging.info("\n" + "="*80)
-        logging.info("MIGRATION SUMMARY")
-        logging.info("="*80)
+        console = Console()
+        
+        console.print("\n")
+        console.rule("[bold cyan]MIGRATION SUMMARY", style="cyan")
+        console.print()
+        
+        # Create summary table
+        table = Table(show_header=True, header_style="bold cyan", border_style="cyan")
+        table.add_column("Object Type", style="white", width=30)
+        table.add_column("Count", justify="right", style="green", width=10)
         
         summary_data = [
             ('Accounts', len(created_accounts)),
@@ -1052,11 +1094,14 @@ def main():
         total = sum(count for _, count in summary_data)
         for obj_type, count in summary_data:
             if count > 0:
-                logging.info(f"  {obj_type:<20} {count:>6} record(s)")
+                table.add_row(obj_type, str(count))
         
-        logging.info(f"  {'-'*28}")
-        logging.info(f"  {'TOTAL':<20} {total:>6} record(s)")
-        logging.info("="*80)
+        # Add separator and total
+        table.add_section()
+        table.add_row("[bold]TOTAL[/bold]", f"[bold]{total}[/bold]")
+        
+        console.print(table)
+        console.print()
         
         # Calculate and display elapsed time
         elapsed_time = time.time() - start_time
@@ -1071,6 +1116,22 @@ def main():
         else:
             time_str = f"{seconds}s"
         
+        console.print(f"[cyan]⏱  Total execution time:[/cyan] [bold white]{time_str}[/bold white]")
+        console.print(f"[dim]ℹ  Counts include both newly created and existing/reused records.[/dim]")
+        console.print(f"[dim]📋 Query log: {Path(script_dir) / 'logs' / 'queries.csv'}[/dim]")
+        console.print()
+        console.rule(style="cyan")
+        
+        # Also log to file for backward compatibility
+        logging.info("="*80)
+        logging.info("MIGRATION SUMMARY")
+        logging.info("="*80)
+        for obj_type, count in summary_data:
+            if count > 0:
+                logging.info(f"  {obj_type:<20} {count:>6} record(s)")
+        logging.info(f"  {'-'*28}")
+        logging.info(f"  {'TOTAL':<20} {total:>6} record(s)")
+        logging.info("="*80)
         logging.info(f"\nTotal execution time: {time_str}")
         logging.info("\nNote: Counts include both newly created and existing/reused records.")
         logging.info("Check output above for specific errors and warnings.")

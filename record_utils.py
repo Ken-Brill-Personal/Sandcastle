@@ -10,7 +10,10 @@ License: MIT License
 
 import os
 import csv
+from rich.console import Console
 from picklist_utils import get_valid_picklist_values
+
+console = Console()
 
 # Global cache for record existence checks to avoid repeated queries
 _record_existence_cache = {}
@@ -104,7 +107,7 @@ def replace_lookups_with_dummies(record, insertable_fields_info, dummy_records, 
                                 sandbox_rt_id = sf_cli_target.get_record_type_id(sobject_type, dev_name)
                                 if sandbox_rt_id:
                                     modified_record[field_name] = sandbox_rt_id
-                                    print(f"  [MAP] RecordType {dev_name}: {prod_lookup_id} → {sandbox_rt_id}")
+                                    console.print(f"  [cyan][MAP] RecordType {dev_name}: {prod_lookup_id} → {sandbox_rt_id}[/cyan]")
                                 else:
                                     print(f"  [WARN] RecordType '{dev_name}' not found in sandbox, removing field")
                                     del modified_record[field_name]
@@ -116,19 +119,19 @@ def replace_lookups_with_dummies(record, insertable_fields_info, dummy_records, 
                             del modified_record[field_name]
                     else:
                         # No CLI provided, remove RecordType (will use default)
-                        print(f"  [REMOVE] RecordTypeId (no CLI provided), will use default RecordType")
+                        console.print(f"  [yellow][REMOVE] RecordTypeId (no CLI provided), will use default RecordType[/yellow]")
                         del modified_record[field_name]
                     continue
                 
                 # Special handling for User lookups
                 # Keep all User lookups from production (users exist in sandbox with same IDs)
                 if referenced_object == 'User':
-                    print(f"  [KEEP] Keeping User lookup {field_name} = {prod_lookup_id} from production (users exist in sandbox)")
+                    console.print(f"  [green][KEEP] Keeping User lookup {field_name} = {prod_lookup_id} from production (users exist in sandbox)[/green]")
                     # Keep the production User lookup as-is
                 # Special handling for OwnerId - keep production value if no mapping available
                 # OwnerId can reference User, Group, or other objects - keep as-is from production
                 elif field_name == 'OwnerId':
-                    print(f"  [KEEP] Keeping {field_name} = {prod_lookup_id} from production (Owner lookups typically exist in sandbox)")
+                    console.print(f"  [green][KEEP] Keeping {field_name} = {prod_lookup_id} from production (Owner lookups typically exist in sandbox)[/green]")
                     # Keep the production OwnerId as-is
                 # For REQUIRED lookups only, try to use mapping or dummy
                 elif field_name in required_lookups:
@@ -137,7 +140,7 @@ def replace_lookups_with_dummies(record, insertable_fields_info, dummy_records, 
                         if prod_lookup_id in created_dict:
                             sandbox_lookup_id = created_dict[prod_lookup_id]
                             modified_record[field_name] = sandbox_lookup_id
-                            print(f"  [MAP] Using real {field_name}: {prod_lookup_id} → {sandbox_lookup_id}")
+                            console.print(f"  [cyan][MAP] Using real {field_name}: {prod_lookup_id} → {sandbox_lookup_id}[/cyan]")
                         elif referenced_object in dummy_records:
                             # Required field but record not created yet - use dummy
                             modified_record[field_name] = dummy_records[referenced_object]
@@ -153,7 +156,7 @@ def replace_lookups_with_dummies(record, insertable_fields_info, dummy_records, 
                 # For ALL optional lookups, remove them to avoid lookup filter issues
                 # Phase 2 will restore them with real production values
                 else:
-                    print(f"  [REMOVE] Removing optional lookup {field_name}, will restore in Phase 2")
+                    console.print(f"  [yellow][REMOVE] Removing optional lookup {field_name}, will restore in Phase 2[/yellow]")
                     del modified_record[field_name]
             # If the field doesn't exist but is required, add dummy
             elif field_name not in modified_record and referenced_object in dummy_records:
@@ -198,7 +201,7 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
         sobject_type: The Salesforce object type (e.g., 'Account', 'Contact'). If not provided, 
                       will try to extract from record attributes.
     """
-    print(f"[FILTER FUNCTION V2] Called with sobject_type={sobject_type}, record has {len(record)} fields")
+    console.print(f"[dim][FILTER FUNCTION V2] Called with sobject_type={sobject_type}, record has {len(record)} fields[/dim]")
     # Determine the sobject type
     if not sobject_type:
         sobject_type = record.get('attributes', {}).get('type') or record.get('sobjectType')
@@ -223,10 +226,10 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
             # Check if the user exists in the sandbox
             if check_record_exists(sf_cli_target, 'User', value):
                 filtered_data[field_name] = value
-                print(f"  [PRESERVE] {field_name} = {value} (User exists in sandbox)")
+                console.print(f"  [green][PRESERVE] {field_name} = {value} (User exists in sandbox)[/green]")
             else:
                 filtered_data[field_name] = fallback_user_id
-                print(f"  [FALLBACK] {field_name} = {fallback_user_id} (Original user {value} not found in sandbox)")
+                console.print(f"  [red][FALLBACK] {field_name} = {fallback_user_id} (Original user {value} not found in sandbox)[/red]")
             continue
         
         # Exclude system fields, relationship fields, process fields, and fields not in our insertable list
@@ -270,16 +273,16 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
                 filtered_data[field_name] = value['Id']
         elif value is not None:
             if field_name == 'Product_Types_Quoted__c':
-                print(f"[DEBUG] Product_Types_Quoted__c: Entered 'value is not None' block")
+                console.print(f"[magenta][DEBUG] Product_Types_Quoted__c: Entered 'value is not None' block[/magenta]")
             # If this is an email field, append '.invalid' to the value
             if 'email' in field_name.lower() and isinstance(value, str) and not value.endswith('.invalid'):
                 if field_name == 'Product_Types_Quoted__c':
-                    print(f"[DEBUG] Product_Types_Quoted__c: Taking EMAIL branch")
+                    console.print(f"[magenta][DEBUG] Product_Types_Quoted__c: Taking EMAIL branch[/magenta]")
                 filtered_data[field_name] = value + '.invalid'
             # Handle picklist fields: check if value is valid, else set to 'Other' or remove
             elif field_type == 'picklist' and isinstance(value, str):
                 if field_name == 'Product_Types_Quoted__c' or field_name == 'Primary_Team__c':
-                    print(f"[DEBUG] {field_name}: Taking PICKLIST branch, value='{value}'")
+                    console.print(f"[magenta][DEBUG] {field_name}: Taking PICKLIST branch, value='{value}'[/magenta]")
                 try:
                     # Try to get valid picklist values for this field
                     valid_values = get_valid_picklist_values(sf_cli_target, sobject_type, field_name) if sobject_type else set()
@@ -316,7 +319,7 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
             # Handle multi-select picklist fields (semicolon-separated values)
             elif field_type == 'multipicklist' and isinstance(value, str):
                 if field_name == 'Product_Types_Quoted__c':
-                    print(f"[DEBUG] Product_Types_Quoted__c: Taking MULTIPICKLIST branch")
+                    console.print(f"[magenta][DEBUG] Product_Types_Quoted__c: Taking MULTIPICKLIST branch[/magenta]")
                 try:
                     valid_values = get_valid_picklist_values(sf_cli_target, sobject_type, field_name) if sobject_type else set()
                     if valid_values:
@@ -369,6 +372,6 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
                     continue
             else:
                 if field_name == 'Product_Types_Quoted__c':
-                    print(f"[DEBUG] Product_Types_Quoted__c: Taking ELSE branch - adding field as-is")
+                    console.print(f"[magenta][DEBUG] Product_Types_Quoted__c: Taking ELSE branch - adding field as-is[/magenta]")
                 filtered_data[field_name] = value
     return filtered_data

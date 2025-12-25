@@ -17,8 +17,10 @@ import logging
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Any
+from rich.console import Console
 
 logger = logging.getLogger(__name__)
+console = Console()
 
 class BulkRecordCreator:
     """
@@ -176,7 +178,14 @@ class BulkRecordCreator:
         
         if result.returncode != 0:
             error_msg = result.stderr or result.stdout
-            logger.warning(f"Bulk create failed: {error_msg}")
+            
+            # Try to pretty-print JSON error if possible
+            try:
+                error_json = json.loads(error_msg)
+                console.print("[yellow]⚠ Bulk create failed:[/yellow]")
+                console.print_json(data=error_json)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Bulk create failed: {error_msg}")
             
             # Try to extract partial results from failed job
             # The error might include a job ID we can query
@@ -203,7 +212,14 @@ class BulkRecordCreator:
                     
                     logger.info(f"Bulk results command returncode: {results_run.returncode}")
                     if results_run.stdout:
-                        logger.info(f"Bulk results stdout: {results_run.stdout[:500]}")
+                        try:
+                            # Try to parse and pretty-print JSON
+                            results_json = json.loads(results_run.stdout)
+                            console.print("[dim]Bulk results:[/dim]")
+                            console.print_json(data=results_json)
+                        except json.JSONDecodeError:
+                            # Fallback to truncated string if not JSON
+                            logger.info(f"Bulk results stdout: {results_run.stdout[:500]}")
                     if results_run.stderr:
                         logger.info(f"Bulk results stderr: {results_run.stderr[:500]}")
                     
@@ -340,10 +356,21 @@ def bulk_update_records(sf_cli_target, sobject: str, records: List[Dict[str, Any
         # Id must be first column
         fieldnames = ['Id'] + sorted([f for f in all_fields if f != 'Id'])
         
+        # Write CSV with LF line endings initially
         with open(csv_file, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
             writer.writeheader()
             writer.writerows(records)
+        
+        # Convert line endings to CRLF (Salesforce Bulk API requirement)
+        with open(csv_file, 'rb') as f:
+            content = f.read()
+        
+        # Replace LF with CRLF, but avoid double CRLF
+        content = content.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+        
+        with open(csv_file, 'wb') as f:
+            f.write(content)
         
         # Execute bulk update via Salesforce CLI
         result = sf_cli_target.bulk_upsert(sobject, str(csv_file), external_id='Id')
