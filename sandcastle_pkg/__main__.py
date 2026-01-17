@@ -212,6 +212,15 @@ def run_pre_migration_setup(config, sf_cli_source, sf_cli_target, script_dir):
     quote_fields = load_insertable_fields('Quote', script_dir)
     order_fields = load_insertable_fields('Order', script_dir)
     case_fields = load_insertable_fields('Case', script_dir)
+
+    # Validate that essential field metadata was loaded
+    if not account_fields:
+        console.print("\n[bold red]ERROR: No Account field metadata found![/bold red]")
+        console.print("[yellow]The fieldData directory is missing or empty.[/yellow]")
+        console.print("\n[cyan]Run the field extraction script first:[/cyan]")
+        console.print("  python extract_fields_with_nillable.py -a <source-org-alias>\n")
+        raise SystemExit(1)
+
     logging.info("✓ Loaded field metadata for all objects\n")
     
     return (account_fields, contact_fields, opportunity_fields, quote_fields, 
