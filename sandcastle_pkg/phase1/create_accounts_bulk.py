@@ -3,7 +3,7 @@
 Bulk Account Creation - Phase 1
 
 Author: Ken Brill
-Version: 1.2.0
+Version: 1.2.2
 Date: January 2026
 License: MIT License
 
@@ -13,6 +13,7 @@ bulk API operations. Significantly faster than one-at-a-time creation.
 import csv
 import json
 import logging
+import re
 import subprocess
 from pathlib import Path
 from collections import defaultdict
@@ -24,6 +25,35 @@ from sandcastle_pkg.utils.csv_utils import write_record_to_csv
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def _find_existing_account(sf_cli_target, record: Dict) -> str:
+    """
+    Try to find an existing account in the sandbox by unique identifier fields.
+    Returns the sandbox ID if found, None otherwise.
+    """
+    # Try different unique identifier fields
+    unique_fields = [
+        ('Customer_ID__c', record.get('Customer_ID__c')),
+        ('NetSuite_ID__c', record.get('NetSuite_ID__c')),
+        ('NetSuiteId__c', record.get('NetSuiteId__c')),
+        ('AccountNumber', record.get('AccountNumber')),
+        ('Sangoma_Portal_ID__c', record.get('Sangoma_Portal_ID__c')),
+    ]
+
+    for field_name, field_value in unique_fields:
+        if field_value:
+            # Escape single quotes for SOQL
+            safe_value = str(field_value).replace("'", "''")
+            query = f"SELECT Id FROM Account WHERE {field_name} = '{safe_value}' LIMIT 1"
+            try:
+                results = sf_cli_target.query_records(query)
+                if results and len(results) > 0:
+                    return results[0]['Id']
+            except Exception:
+                pass  # Field might not exist, try next
+
+    return None
 
 
 def build_account_dependency_graph(
@@ -250,6 +280,9 @@ def bulk_create_accounts_wave(
             response = json.loads(result.stdout)
             if response.get('status') == 0:
                 result_data = response.get('result', {})
+                job_info = result_data.get('jobInfo', {})
+                num_processed = job_info.get('numberRecordsProcessed', 0)
+                num_failed = job_info.get('numberRecordsFailed', 0)
 
                 # Read success file to get created IDs
                 success_file = result_data.get('successFilePath')
@@ -260,20 +293,32 @@ def bulk_create_accounts_wave(
                             sf_id = row.get('sf__Id') or row.get('Id')
                             if sf_id and idx < len(prod_ids):
                                 created_mapping[prod_ids[idx]] = sf_id
-
-                job_info = result_data.get('jobInfo', {})
-                num_processed = job_info.get('numberRecordsProcessed', len(created_mapping))
-                num_failed = job_info.get('numberRecordsFailed', 0)
+                else:
+                    # No success file - check if all failed
+                    if num_failed > 0:
+                        console.print(f"[yellow]No success file found - all {num_failed} records may have failed[/yellow]")
 
                 if num_failed > 0:
-                    # Log failures
+                    # Log failures with details
                     failed_file = result_data.get('failedFilePath')
                     if failed_file and Path(failed_file).exists():
+                        console.print(f"[red]Bulk create had {num_failed} failures. Reading error details...[/red]")
+                        error_count = 0
+                        unique_errors = set()
                         with open(failed_file, 'r', encoding='utf-8') as f:
                             reader = csv.DictReader(f)
                             for row in reader:
                                 error = row.get('sf__Error', 'Unknown error')
+                                unique_errors.add(error)
+                                error_count += 1
+                                if error_count <= 5:  # Show first 5 errors
+                                    console.print(f"  [red]Error: {error}[/red]")
                                 logger.warning(f"Bulk create failed for record: {error}")
+                        if error_count > 5:
+                            console.print(f"  [dim]...and {error_count - 5} more errors[/dim]")
+                        console.print(f"[yellow]Unique error types ({len(unique_errors)}):[/yellow]")
+                        for ue in list(unique_errors)[:3]:
+                            console.print(f"  [yellow]- {ue[:200]}[/yellow]")
 
                 logger.info(f"Bulk created {len(created_mapping)}/{len(records)} {sobject} records")
         except json.JSONDecodeError:
@@ -281,10 +326,16 @@ def bulk_create_accounts_wave(
     else:
         # Handle failure - try to get partial results
         error_msg = result.stderr or result.stdout
+        console.print(f"[red]Bulk create command failed![/red]")
         logger.warning(f"Bulk create returned non-zero: {error_msg[:500]}")
 
         try:
             response = json.loads(result.stdout) if result.stdout else {}
+
+            # Show error message from response
+            if response.get('message'):
+                console.print(f"[red]Error: {response.get('message')}[/red]")
+
             job_id = response.get('data', {}).get('jobId') or response.get('result', {}).get('jobInfo', {}).get('id')
 
             if job_id:
@@ -302,6 +353,7 @@ def bulk_create_accounts_wave(
                     if results_response.get('status') == 0:
                         result_data = results_response.get('result', {})
                         success_file = result_data.get('successFilePath')
+                        failed_file = result_data.get('failedFilePath')
 
                         if success_file and Path(success_file).exists():
                             with open(success_file, 'r', encoding='utf-8') as f:
@@ -312,11 +364,34 @@ def bulk_create_accounts_wave(
                                         created_mapping[prod_ids[idx]] = sf_id
 
                             logger.info(f"Retrieved {len(created_mapping)} successful IDs from partial results")
+
+                        # Show errors from failed file
+                        if failed_file and Path(failed_file).exists():
+                            console.print(f"[red]Reading error details from failed records...[/red]")
+                            error_count = 0
+                            unique_errors = set()
+                            with open(failed_file, 'r', encoding='utf-8') as f:
+                                reader = csv.DictReader(f)
+                                for row in reader:
+                                    error = row.get('sf__Error', 'Unknown error')
+                                    unique_errors.add(error)
+                                    error_count += 1
+                                    if error_count <= 5:
+                                        console.print(f"  [red]Error: {error}[/red]")
+                            if error_count > 5:
+                                console.print(f"  [dim]...and {error_count - 5} more errors[/dim]")
+                            console.print(f"[yellow]Unique error types ({len(unique_errors)}):[/yellow]")
+                            for ue in list(unique_errors)[:3]:
+                                console.print(f"  [yellow]- {ue[:200]}[/yellow]")
         except Exception as e:
             logger.warning(f"Could not retrieve partial results: {e}")
+            console.print(f"[red]Could not retrieve error details: {e}[/red]")
 
-    # Clean up temp file
-    csv_file.unlink(missing_ok=True)
+    # Clean up temp file (keep it if all failed for debugging)
+    if len(created_mapping) > 0 or len(records) == 0:
+        csv_file.unlink(missing_ok=True)
+    else:
+        console.print(f"[dim]CSV file kept for debugging: {csv_file}[/dim]")
 
     return created_mapping
 
@@ -411,75 +486,121 @@ def create_accounts_bulk_phase1(
     for i, wave in enumerate(waves):
         logging.info(f"    Wave {i+1}: {len(wave)} account(s)")
 
-    # Step 3: Process each wave
+    # Step 3: Prepare all records first (outside progress bar to avoid output mixing)
+    console.print(f"  [cyan]Preparing {total_accounts} accounts for bulk creation...[/cyan]")
+
+    wave_batches = []  # List of (wave_num, batch_index, prepared_records, original_records, prod_ids)
+
+    for wave_num, wave in enumerate(waves, 1):
+        for batch_start in range(0, len(wave), batch_size):
+            batch = wave[batch_start:batch_start + batch_size]
+
+            prepared_records = []
+            original_records = {}
+            prod_ids = []
+
+            for prod_account_id in batch:
+                record = all_account_records[prod_account_id]
+
+                try:
+                    prepared, original = prepare_account_for_bulk(
+                        record,
+                        account_fields,
+                        created_accounts,
+                        dummy_records,
+                        sf_cli_source,
+                        sf_cli_target,
+                        lookup_fields
+                    )
+
+                    prepared_records.append(prepared)
+                    original_records[prod_account_id] = original
+                    prod_ids.append(prod_account_id)
+                except Exception as e:
+                    logger.warning(f"Failed to prepare account {prod_account_id}: {e}")
+
+            if prepared_records:
+                wave_batches.append((wave_num, len(wave_batches), prepared_records, original_records, prod_ids))
+
+    console.print(f"  [green]Prepared {total_accounts} accounts in {len(wave_batches)} batch(es)[/green]")
+
+    # Step 4: Create records with progress bar
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TaskProgressColumn(),
-        console=console
+        console=console,
+        transient=False
     ) as progress:
-        overall_task = progress.add_task(f"[cyan]Creating {total_accounts} accounts in {len(waves)} waves", total=total_accounts)
+        overall_task = progress.add_task(f"[cyan]Creating accounts", total=total_accounts)
 
-        for wave_num, wave in enumerate(waves, 1):
-            wave_desc = f"Wave {wave_num}/{len(waves)}: {len(wave)} accounts"
-            progress.update(overall_task, description=f"[cyan]{wave_desc}")
+        for wave_num, batch_idx, prepared_records, original_records, prod_ids in wave_batches:
+            progress.update(overall_task, description=f"[cyan]Wave {wave_num}/{len(waves)}: batch {batch_idx+1}")
 
-            # Process wave in batches
-            for batch_start in range(0, len(wave), batch_size):
-                batch = wave[batch_start:batch_start + batch_size]
+            # Bulk create this batch
+            batch_results = bulk_create_accounts_wave(
+                sf_cli_target,
+                'Account',
+                prepared_records,
+                prod_ids
+            )
 
-                # Prepare records for this batch
-                prepared_records = []
-                original_records = {}
-                prod_ids = []
+            # If bulk failed completely, try single-record creation for first record to see error
+            if len(batch_results) == 0 and len(prepared_records) > 0:
+                progress.stop()  # Stop progress bar for cleaner output
+                console.print(f"\n[yellow]Bulk creation failed. Trying single-record creation to diagnose...[/yellow]")
+                try:
+                    # Try to create just the first record to see the actual error
+                    first_record = prepared_records[0]
+                    first_prod_id = prod_ids[0]
+                    console.print(f"[dim]Attempting to create account {first_prod_id}...[/dim]")
+                    sandbox_id = sf_cli_target.create_record('Account', first_record)
+                    if sandbox_id:
+                        console.print(f"[green]Single record created successfully: {sandbox_id}[/green]")
+                        batch_results[first_prod_id] = sandbox_id
+                    else:
+                        console.print(f"[red]Single record creation also failed (no ID returned)[/red]")
+                except Exception as single_error:
+                    error_msg = str(single_error)
+                    # Check for duplicate - extract existing ID and use it
+                    if "duplicate value found" in error_msg.lower():
+                        match = re.search(r'with id:\s*([a-zA-Z0-9]{15,18})', error_msg)
+                        if match:
+                            existing_id = match.group(1)
+                            if existing_id.startswith('0'):
+                                console.print(f"[blue]Found existing Account {existing_id}, using it[/blue]")
+                                batch_results[first_prod_id] = existing_id
+                                # Try to use existing IDs for remaining records too
+                                console.print(f"[yellow]Records already exist in sandbox. Querying for existing IDs...[/yellow]")
+                                for i, prod_id in enumerate(prod_ids):
+                                    if prod_id in batch_results:
+                                        continue
+                                    # Query for existing record by unique fields
+                                    record = prepared_records[i]
+                                    existing = _find_existing_account(sf_cli_target, record)
+                                    if existing:
+                                        batch_results[prod_id] = existing
+                    else:
+                        console.print(f"[red]Single record error: {error_msg[:500]}[/red]")
+                        console.print(f"[dim]Fields in record: {list(first_record.keys())[:20]}...[/dim]")
+                progress.start()  # Resume progress bar
 
-                for prod_account_id in batch:
-                    record = all_account_records[prod_account_id]
+            # Update mappings and write CSVs
+            for prod_id, sandbox_id in batch_results.items():
+                created_accounts[prod_id] = sandbox_id
 
-                    try:
-                        prepared, original = prepare_account_for_bulk(
-                            record,
-                            account_fields,
-                            created_accounts,
-                            dummy_records,
-                            sf_cli_source,
-                            sf_cli_target,
-                            lookup_fields
-                        )
+                # Write to CSV for Phase 2
+                if prod_id in original_records:
+                    write_record_to_csv('Account', prod_id, sandbox_id, original_records[prod_id], script_dir)
 
-                        prepared_records.append(prepared)
-                        original_records[prod_account_id] = original
-                        prod_ids.append(prod_account_id)
-                    except Exception as e:
-                        logger.warning(f"Failed to prepare account {prod_account_id}: {e}")
+            progress.advance(overall_task, len(prod_ids))
 
-                if not prepared_records:
-                    continue
-
-                # Bulk create this batch
-                batch_results = bulk_create_accounts_wave(
-                    sf_cli_target,
-                    'Account',
-                    prepared_records,
-                    prod_ids
-                )
-
-                # Update mappings and write CSVs
-                for prod_id, sandbox_id in batch_results.items():
-                    created_accounts[prod_id] = sandbox_id
-
-                    # Write to CSV for Phase 2
-                    if prod_id in original_records:
-                        write_record_to_csv('Account', prod_id, sandbox_id, original_records[prod_id], script_dir)
-
-                progress.advance(overall_task, len(batch))
-
-                # Log batch results
-                success_count = len(batch_results)
-                fail_count = len(batch) - success_count
-                if fail_count > 0:
-                    logger.warning(f"  Batch: {success_count} created, {fail_count} failed")
+            # Log batch results
+            success_count = len(batch_results)
+            fail_count = len(prod_ids) - success_count
+            if fail_count > 0:
+                logger.warning(f"  Batch: {success_count} created, {fail_count} failed")
 
     # Summary
     console.print()

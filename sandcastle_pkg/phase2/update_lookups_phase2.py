@@ -9,7 +9,7 @@ from sandcastle_pkg.utils.csv_utils import read_migration_csv
 Lookup Relationship Updates - Phase 2
 
 Author: Ken Brill
-Version: 1.2.0
+Version: 1.2.2
 Date: December 24, 2025
 License: MIT License
 """

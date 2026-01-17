@@ -3,7 +3,7 @@
 Salesforce CLI Wrapper
 
 Author: Ken Brill
-Version: 1.2.0
+Version: 1.2.2
 Date: December 24, 2025
 License: MIT License
 """
