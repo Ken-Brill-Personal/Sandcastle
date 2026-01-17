@@ -152,7 +152,7 @@ def update_lookups_phase2(sf_cli_source, sf_cli_target, script_dir, insertable_f
         logging.info(f"  Performing bulk update of {len(bulk_updates)} record(s)...")
         
         try:
-            from bulk_utils import bulk_update_records
+            from sandcastle_pkg.utils.bulk_utils import bulk_update_records
             result = bulk_update_records(sf_cli_target, object_type, bulk_updates)
             
             if result and result.get('success'):
