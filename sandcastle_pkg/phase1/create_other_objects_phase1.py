@@ -45,8 +45,8 @@ def create_product2_phase1(prod_product_id, created_products, sf_cli_source, sf_
                 console.print(f"  [green]✓ Found existing Product2 by ProductCode: {existing_product_id}[/green]")
     
     if not existing_product_id and product_name:
-        # Escape single quotes in name for SOQL
-        safe_name = product_name.replace("'", "\\'")
+        # Escape single quotes in name for SOQL (SOQL uses doubled single quotes)
+        safe_name = product_name.replace("'", "''")
         query = f"SELECT Id FROM Product2 WHERE Name = '{safe_name}' LIMIT 1"
         existing = sf_cli_target.query_records(query)
         if existing and len(existing) > 0:

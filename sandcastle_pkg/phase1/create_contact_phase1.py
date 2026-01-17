@@ -54,11 +54,13 @@ def create_contact_phase1(prod_contact_id, created_contacts, contact_insertable_
     # Capture processing output
     with console.capture() as capture:
         # Replace lookups with dummy IDs (especially AccountId)
+        # Pass created_accounts so Contacts can map to already-created Accounts
+        created_mappings = {'Account': created_accounts or {}}
         record_with_dummies = replace_lookups_with_dummies(
             prod_contact_record,
             contact_insertable_fields_info,
             dummy_records,
-            None,
+            created_mappings,
             sf_cli_source,
             sf_cli_target,
             'Contact'

@@ -18,15 +18,49 @@ console = Console()
 # Global cache for record existence checks to avoid repeated queries
 _record_existence_cache = {}
 
+# Cache for fallback user ID (queried once per target org)
+_fallback_user_cache = {}
+
+def get_fallback_user_id(sf_cli_target):
+    """
+    Get a fallback user ID for OwnerId when the original user doesn't exist in sandbox.
+    Queries for the first active standard user and caches the result.
+
+    Args:
+        sf_cli_target: Target Salesforce CLI instance
+
+    Returns:
+        str: User ID or None if no users found
+    """
+    cache_key = sf_cli_target.target_org
+
+    if cache_key in _fallback_user_cache:
+        return _fallback_user_cache[cache_key]
+
+    try:
+        # Query for an active standard user
+        query = "SELECT Id FROM User WHERE IsActive = true AND UserType = 'Standard' LIMIT 1"
+        result = sf_cli_target.query_records(query)
+        if result and len(result) > 0:
+            user_id = result[0]['Id']
+            _fallback_user_cache[cache_key] = user_id
+            return user_id
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not query fallback user: {e}[/yellow]")
+
+    _fallback_user_cache[cache_key] = None
+    return None
+
+
 def check_record_exists(sf_cli, object_type, record_id):
     """
     Check if a record exists in the target org, with caching to avoid repeated queries.
-    
+
     Args:
         sf_cli: Salesforce CLI instance
         object_type: Salesforce object type (e.g., 'User', 'Account', 'Contact')
         record_id: Record ID to check
-        
+
     Returns:
         bool: True if record exists, False otherwise
     """
@@ -215,10 +249,10 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
     # User lookup fields that should be preserved - only OwnerId can be set
     # CreatedById and LastModifiedById are system-managed and cannot be set
     user_lookup_fields = {'OwnerId'}
-    
-    # Fallback user ID that always exists in sandbox
-    fallback_user_id = '0052E00000MrqyAQAR'
-    
+
+    # Get fallback user ID dynamically (cached after first query)
+    fallback_user_id = get_fallback_user_id(sf_cli_target)
+
     filtered_data = {}
     for field_name, value in record.items():
         # Preserve OwnerId only if the user exists in sandbox, otherwise use fallback
@@ -227,9 +261,12 @@ def filter_record_data(record, insertable_fields_info, sf_cli_target, sobject_ty
             if check_record_exists(sf_cli_target, 'User', value):
                 filtered_data[field_name] = value
                 console.print(f"  [green][PRESERVE] {field_name} = {value} (User exists in sandbox)[/green]")
-            else:
+            elif fallback_user_id:
                 filtered_data[field_name] = fallback_user_id
-                console.print(f"  [red][FALLBACK] {field_name} = {fallback_user_id} (Original user {value} not found in sandbox)[/red]")
+                console.print(f"  [yellow][FALLBACK] {field_name} = {fallback_user_id} (Original user {value} not found in sandbox)[/yellow]")
+            else:
+                # No fallback available, skip the field and let Salesforce use default
+                console.print(f"  [yellow][SKIP] {field_name} - Original user {value} not found and no fallback available[/yellow]")
             continue
         
         # Exclude system fields, relationship fields, process fields, and fields not in our insertable list
