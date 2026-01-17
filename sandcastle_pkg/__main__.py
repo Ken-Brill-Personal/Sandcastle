@@ -3,7 +3,7 @@
 SandCastle - Main Entry Point
 
 Author: Ken Brill
-Version: 1.1.8
+Version: 1.2.0
 Date: December 24, 2025
 License: MIT License
 """
@@ -33,6 +33,7 @@ from sandcastle_pkg.phase1 import (
     delete_existing_records,
     create_dummy_records,
     create_account_phase1,
+    create_accounts_bulk_phase1,
     create_contact_phase1,
     create_opportunity_phase1,
     create_quote_phase1,
@@ -98,92 +99,15 @@ def show_title_screen():
 
 def create_accounts_phase1(config, account_fields, sf_cli_source, sf_cli_target, dummy_records, script_dir):
     """
-    Phase 1: Create all accounts (root + related) using dynamic relationship expansion.
+    Phase 1: Create all accounts (root + related) using bulk API with dependency sorting.
     Returns dictionary mapping production Account IDs to sandbox IDs.
+
+    This uses wave-based bulk creation for significantly faster performance.
     """
-    created_accounts = {}
-    
-    # OPTIMIZED: Batch fetch all accounts (root + all related accounts) at once
-    logging.info(f"\n--- Phase 1: Accounts (Root + All Related) ---")
-
-    # Step 1: Build comprehensive query to fetch all related accounts
-    root_account_ids = list(config["Accounts"])
-
-    # Warn if many root accounts - could cause query size issues
-    if len(root_account_ids) > 50:
-        logging.warning(f"  Warning: {len(root_account_ids)} root accounts may cause slow queries. Consider reducing.")
-
-    ids_str = "','".join(root_account_ids)
-    
-    # Build field list for query (account_fields is a dict: field_name -> field_info)
-    field_names = [name for name in account_fields.keys() if name not in ['Id']]
-    if field_names:
-        fields_str = 'Id, ' + ', '.join(field_names)
-    else:
-        fields_str = 'Id'
-    
-    # Step 2: Dynamically build WHERE clause for ALL Account lookup/hierarchy fields
-    # Find all fields that reference Account (Lookup or Hierarchy type)
-    account_lookup_fields = []
-    for field_name, field_info in account_fields.items():
-        if field_info.get('type') in ['reference', 'hierarchy'] and field_info.get('referenceTo') == 'Account':
-            account_lookup_fields.append(field_name)
-    
-    # Build OR conditions for each Account lookup field
-    where_conditions = [f"Id IN ('{ids_str}')"]
-    for field_name in account_lookup_fields:
-        where_conditions.append(f"{field_name} IN ('{ids_str}')")
-    
-    where_clause = " OR ".join(where_conditions)
-    
-    locations_limit = config.get("locations_limit", 10)
-    if locations_limit == -1:
-        limit_clause = ""
-    else:
-        # Calculate limit: locations per root account * number of roots * buffer for related records
-        # Cap at 10,000 to stay well under Salesforce's 50,000 row query limit
-        calculated_limit = min(locations_limit * len(root_account_ids) * 10, 10000)
-        limit_clause = f" LIMIT {calculated_limit}"
-
-    logging.info(f"  Found {len(account_lookup_fields)} Account lookup/hierarchy field(s): {', '.join(account_lookup_fields)}")
-    logging.info(f"  Querying all accounts related to {len(root_account_ids)} root account(s)")
-    query = f"""SELECT {fields_str} FROM Account 
-               WHERE {where_clause}
-               {limit_clause}"""
-    
-    all_account_records = {}
-    batch_records = sf_cli_source.query_records(query) or []
-    for record in batch_records:
-        all_account_records[record['Id']] = record
-    
-    logging.info(f"  Fetched {len(all_account_records)} account record(s) in one query")
-    
-    # Step 3: Process root accounts first
-    logging.info(f"  Creating {len(root_account_ids)} root account(s)")
-    total_accounts = len(all_account_records)
-    current_index = 1
-    for prod_account_id in root_account_ids:
-        if prod_account_id in all_account_records:
-            create_account_phase1(prod_account_id, created_accounts, account_fields,
-                                sf_cli_source, sf_cli_target, dummy_records, script_dir,
-                                prefetched_record=all_account_records[prod_account_id],
-                                all_prefetched_accounts=all_account_records,
-                                progress_index=current_index, total_count=total_accounts)
-            current_index += 1
-    
-    # Step 4: Process all other related accounts
-    related_account_ids = [acc_id for acc_id in all_account_records.keys() if acc_id not in root_account_ids]
-    if related_account_ids:
-        logging.info(f"  Creating {len(related_account_ids)} related account(s)")
-        for prod_account_id in related_account_ids:
-            create_account_phase1(prod_account_id, created_accounts, account_fields,
-                                sf_cli_source, sf_cli_target, dummy_records, script_dir,
-                                prefetched_record=all_account_records[prod_account_id],
-                                all_prefetched_accounts=all_account_records,
-                                progress_index=current_index, total_count=total_accounts)
-            current_index += 1
-    
-    return created_accounts
+    return create_accounts_bulk_phase1(
+        config, account_fields, sf_cli_source, sf_cli_target,
+        dummy_records, script_dir
+    )
 
 
 def run_pre_migration_setup(config, sf_cli_source, sf_cli_target, script_dir):

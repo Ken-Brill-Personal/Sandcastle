@@ -3,7 +3,7 @@
 Quote, Order, Case Creation - Phase 1
 
 Author: Ken Brill
-Version: 1.1.8
+Version: 1.2.0
 Date: December 24, 2025
 License: MIT License
 
